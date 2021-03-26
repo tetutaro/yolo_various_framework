@@ -1,0 +1,8 @@
+numpy
+simplejson
+torch
+onnx
+onnxruntime
+onnx-tf
+tf2onnx
+PyYAML
