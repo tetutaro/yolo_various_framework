@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-from typing import List
+from typing import List, Optional
 import os
 import time
 import glob
@@ -16,16 +16,20 @@ NUM_TRAINING_IMAGES = 100
 
 def save_frozen_graph(
     path_pb: str,
-    model_keras: tf.keras.Model
+    model_keras: tf.keras.Model,
+    input_keras: Optional[tf.keras.Input] = None
 ) -> None:
     if os.path.isfile(path_pb):
         return
+    if input_keras is None:
+        input_shape = model_keras.inputs[0].shape
+        input_dtype = model_keras.inputs[0].dtype
+    else:
+        input_shape = input_keras.shape
+        input_dtype = input_keras.dtype
     full_model = tf.function(lambda x: model_keras(x))
     full_model = full_model.get_concrete_function(
-        tf.TensorSpec(
-            model_keras.inputs[0].shape,
-            model_keras.inputs[0].dtype
-        )
+        tf.TensorSpec(input_shape, input_dtype)
     )
     frozen_func = convert_variables_to_constants_v2(full_model)
     frozen_func.graph.as_graph_def()

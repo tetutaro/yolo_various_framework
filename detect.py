@@ -46,10 +46,6 @@ if __name__ == '__main__':
         help='directory contains images to detect'
     )
     parser.add_argument(
-        '-n', '--names', type=str, default='coco.names',
-        help='file of category name list" (default: "coco.names")'
-    )
-    parser.add_argument(
         '-c', '--conf-threshold', type=float, default=0.25,
         help='threshold of confidence score to adopt a bounding box'
     )

@@ -8,6 +8,8 @@ if [ ! -d ${dir} ]; then
     echo "${dir} not found"
     exit 1
 fi
+datanames=(${dir//\// })
+dataname=${datanames[${#datanames[@]}-1]}
 models=(
     "yolov5s" "yolov5m" "yolov5l" "yolov5x"
 )
@@ -19,11 +21,11 @@ quants=(
 )
 for frame in ${frames[@]} ; do
     for model in ${models[@]} ; do
-        ./detect.py -m ${model} -f ${frame} -d ${dir}
+        object_detection_metrics -t ${dir}/ground_truths.jsonl -p results/${dataname}/${model}_${frame}/predictions.jsonl
     done
 done
 for quant in ${quants[@]} ; do
     for model in ${models[@]} ; do
-        ./detect.py -m ${model} -f tflite -q ${quant} -d ${dir}
+        object_detection_metrics -t ${dir}/ground_truths.jsonl -p results/${dataname}/${model}_tflite_${quant}/predictions.jsonl
     done
 done

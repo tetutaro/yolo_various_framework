@@ -71,6 +71,7 @@ all deep learing platforms below were ran on Python 3.7.9
 - download pre-trained weights
     - see weights/README
 - convert pre-trained weights to various platforms
+    - `./convert_yolo.py`
     - `./convert_yolov5.py`
 - (if you want to calc metrics) please install [`object_detection_metrics`](https://github.com/tetutaro/object_detection_metrics)
     - `> pip install "git+https://github.com/tetutaro/object_detection_metrics.git`

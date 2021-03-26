@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-from __future__ import annotations
 from typing import List, Dict
 import os
 import yaml
@@ -40,8 +39,7 @@ def _convert_tf_keras_model(
         _ = yy.numpy()
     # create keras model
     inputs_keras = tf.keras.Input(
-        shape=(*imgsize, 3),
-        batch_size=1
+        shape=(*imgsize, 3), batch_size=1
     )
     outputs_keras = model_tf.predict(inputs=inputs_keras)
     model_keras = tf.keras.Model(
@@ -88,11 +86,11 @@ def yolov5_convert_tf_tflite(
         nclasses=nclasses,
         config=config
     )
-    # save as SavedModel
+    # save as Frozen Graph
     save_frozen_graph(
         path_pb=f'{directory}/{model}.pb', model_keras=model_keras
     )
-    # TFLite model export
+    # convert TFLite model
     path_tflite = f'{directory}/{model}_fp32.tflite'
     convert_tflite_fp32(path_tflite=path_tflite, model_keras=model_keras)
     path_tflite = f'{directory}/{model}_fp16.tflite'

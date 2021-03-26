@@ -104,7 +104,7 @@ class Session(object):
         )
         return xyxy
 
-    def draw_prediction(self: Session, names: Dict) -> Image:
+    def draw_prediction(self: Session, category_map: Dict) -> Image:
         fontsize = int(round(max(
             self.raw_width, self.raw_height
         ) / 32.0))
@@ -127,7 +127,7 @@ class Session(object):
             ymax = int(min(ymax, self.raw_height - margin))
             cls = int(cls)
             prob = round(prob, 3)
-            name = names.get(cls)
+            name = category_map[cls]['category_name']
             if name is None:
                 name = str(cls)
             color = tuple(np.array(np.array(cm.jet((
@@ -162,7 +162,6 @@ class Config(object):
         framework: str,
         quantize: str,
         image_dir: str,
-        names: str,
         conf_threshold: float,
         iou_threshold: float,
     ) -> None:
@@ -170,7 +169,6 @@ class Config(object):
         self.framework = framework
         self.quantize = quantize
         self.image_dir = image_dir
-        self.names = names
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
         return
@@ -198,7 +196,11 @@ class Model(object):
         self.config = config
         # self.framework= Framework(config=config)
         self.framework = None
+        self.category_map = self.read_labels()
         return
+
+    def read_labels(self: Model) -> Dict:
+        return {}
 
     def prep_image(self: Model, sess: Session) -> None:
         return
@@ -226,13 +228,8 @@ class Detector(object):
                 dataset_name, config.model, config.framework
             )
         os.makedirs(self.result_dir, exist_ok=True)
-        self.names = dict()
-        if os.path.isfile(config.names):
-            with open(config.names, 'rt') as rf:
-                for i, name in enumerate(rf.read().strip().splitlines()):
-                    self.names[i] = name
         self.wf = open(os.path.join(
-            self.result_dir, 'predictions.json'
+            self.result_dir, 'predictions.jsonl'
         ), 'wt')
         return
 
@@ -297,10 +294,12 @@ class Detector(object):
         for pbox in sess.pred_bboxes.tolist():
             box = [
                 float(pbox[0]), float(pbox[1]),
-                float(pbox[2]), float(pbox[3])
+                float(pbox[2] - pbox[0]), float(pbox[3] - pbox[1])
             ]
             bbox = {
-                'category_id': int(pbox[4]),
+                'category_id': self.model.category_map[
+                    int(pbox[4])
+                ]['coco_category_id'],
                 'bbox': box,
                 'score': float(pbox[5]),
             }
@@ -319,7 +318,7 @@ class Detector(object):
         return
 
     def dump_image(self: Detector, sess: Session) -> None:
-        image = sess.draw_prediction(names=self.names)
+        image = sess.draw_prediction(category_map=self.model.category_map)
         path_image = os.path.join(self.result_dir, sess.name)
         image.save(path_image)
         return

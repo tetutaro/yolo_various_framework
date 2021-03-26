@@ -659,7 +659,7 @@ class tf_YoloV5(Layer):
         )
         return
 
-    def predict(self: tf_YoloV5, inputs: tf.Tensor):
+    def predict(self: tf_YoloV5, inputs: tf.Tensor) -> tf.Tensor:
         y = list()  # outputs
         x = inputs
         for i, m in enumerate(self.model.layers):

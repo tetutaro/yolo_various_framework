@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-from typing import List, Union
 import os
 import glob
 import shutil
@@ -8,17 +7,6 @@ from collections import defaultdict
 import numpy as np
 import simplejson as json
 import argparse
-
-
-def convert_xywh_xyxy(
-    xywh: List[Union[int, float]]
-) -> List[float]:
-    return [
-        float(xywh[0]),
-        float(xywh[1]),
-        float(xywh[0] + xywh[2]),
-        float(xywh[1] + xywh[3])
-    ]
 
 
 def create_dataset(number: int, directory: str) -> None:
@@ -42,7 +30,7 @@ def create_dataset(number: int, directory: str) -> None:
         image_id = '%012d' % ann['image_id']
         bboxes[image_id].append({
             'category_id': ann['category_id'],
-            'bbox': convert_xywh_xyxy(ann['bbox']),
+            'bbox': [float(x) for x in ann['bbox']],
         })
     # copy images and dump annotations
     new_anns = list()

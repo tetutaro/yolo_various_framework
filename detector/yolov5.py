@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 from __future__ import annotations
+from typing import Dict
 from detector.base import Session, Config, Framework, Model, Detector
 import os
 import numpy as np
@@ -229,6 +230,17 @@ class YoloV5(Model):
                 f'YOLO V5 unsupport {config.framework}'
             )
         return
+
+    def read_labels(self: YoloV5) -> Dict:
+        category_map = dict()
+        with open('labels/coco_labels.txt', 'rt') as rf:
+            for i, raw in enumerate(rf.read().strip().splitlines()):
+                id_label = raw.strip().split(' ', 1)
+                category_map[i] = {
+                    'coco_category_id': int(id_label[0]) + 1,
+                    'category_name': id_label[1]
+                }
+        return category_map
 
     def prep_image(self: YoloV5, sess: Session) -> None:
         sess.padding_image(
