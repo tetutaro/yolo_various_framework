@@ -4,10 +4,13 @@ import os
 import argparse
 from detector.base import Config
 from detector.yolov5 import DetectorYoloV5
+from detector.yolo import DetectorYolo
 
 
 def main(config: Config) -> None:
-    if config.model.startswith('yolov5'):
+    if config.model.startswith(('yolov3', 'yolov4')):
+        detector = DetectorYolo(config=config)
+    elif config.model.startswith('yolov5'):
         detector = DetectorYoloV5(config=config)
     else:
         raise SystemError(f'model is incorrect ({config.model})')
@@ -27,6 +30,8 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '-m', '--model', type=str, required=True, choices=[
+            'yolov3-tiny', 'yolov3',
+            'yolov4',
             'yolov5s', 'yolov5m', 'yolov5l', 'yolov5x',
         ], help='model name'
     )
@@ -46,7 +51,7 @@ if __name__ == '__main__':
         help='directory contains images to detect'
     )
     parser.add_argument(
-        '-c', '--conf-threshold', type=float, default=0.25,
+        '-c', '--conf-threshold', type=float, default=0.3,
         help='threshold of confidence score to adopt a bounding box'
     )
     parser.add_argument(

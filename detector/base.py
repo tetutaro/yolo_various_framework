@@ -37,6 +37,7 @@ class Session(object):
         self.offset_height = None
         self.offset_width = None
         self.pad_image = None
+        self.yolo_input = None
         self.yolov5_input = None
         self.crowddet_input = None
         self.elapsed_ms = None
@@ -200,7 +201,17 @@ class Model(object):
         return
 
     def read_labels(self: Model) -> Dict:
-        return {}
+        category_map = dict()
+        with open('labels/coco_labels.txt', 'rt') as rf:
+            for i, raw in enumerate(rf.read().strip().splitlines()):
+                id_label = raw.strip().split(' ', 1)
+                category_id = int(id_label[0])
+                category_name = id_label[1].strip()
+                category_map[i] = {
+                    'coco_category_id': category_id + 1,
+                    'category_name': category_name,
+                }
+        return category_map
 
     def prep_image(self: Model, sess: Session) -> None:
         return

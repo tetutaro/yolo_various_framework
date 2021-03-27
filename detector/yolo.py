@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 from __future__ import annotations
+from typing import List
 from detector.base import Session, Config, Framework, Model, Detector
 import os
 import numpy as np
@@ -11,12 +12,40 @@ from models.tf_yolov5 import WrapperYoloV5
 from openvino.inference_engine import IECore
 from utils.convert_tflite import load_frozen_graph
 
-IMAGE_SIZE = 640
-path_wt = 'weights/yolov5'
+IMAGE_SIZES = {
+    'yolov3-tiny': 512,
+    'yolov3': 512,
+    'yolov4-tiny': 512,
+    'yolov4': 512,
+    'yolov4-csp': 640,
+    'yolov4x-mish': 640,
+}
+STRIDE_ANCHORS = {
+    'yolov3-tiny': {
+        16: [(10, 14), (23, 27), (37, 58)],
+        32: [(81, 82), (135, 169), (344, 319)],
+    },
+    'yolov3': {
+        8: [(10, 13), (16, 30), (33, 23)],
+        16: [(30, 61), (62, 45), (59, 119)],
+        32: [(116, 90), (156, 198), (373, 326)],
+    },
+    'yolov4': {
+        8: [(12, 16), (19, 36), (40, 28)],
+        16: [(36, 75), (76, 55), (72, 146)],
+        32: [(142, 110), (192, 243), (459, 401)],
+    },
+}
+STRIDE_XYSCALES = {
+    'yolov3-tiny': {16: 1.0, 32: 1.0},
+    'yolov3': {8: 1.0, 16: 1.0, 32: 1.0},
+    'yolov4': {8: 1.05, 16: 1.1, 32: 1.2},
+}
+path_wt = 'weights/yolo'
 
 
-class YoloV5TFOnnx(Framework):
-    def __init__(self: YoloV5TFOnnx, config: Config) -> None:
+class YoloTFOnnx(Framework):
+    def __init__(self: YoloTFOnnx, config: Config) -> None:
         super().__init__(config=config)
         path_model = f'{path_wt}/tf_{config.model}.onnx'
         if not os.path.isfile(path_model):
@@ -26,25 +55,27 @@ class YoloV5TFOnnx(Framework):
         assert len(input_blob) == 1 and input_blob[0] == 'x:0'
         self.input_name = input_blob[0]
         input_shape = self.sess.get_inputs()[0].shape
-        assert input_shape[2] == IMAGE_SIZE
-        assert input_shape[3] == IMAGE_SIZE
+        assert input_shape[2] == IMAGE_SIZES[self.config.model]
+        assert input_shape[3] == IMAGE_SIZES[self.config.model]
         output_blob = [x.name for x in self.sess.get_outputs()]
         assert 'Identity:0' in output_blob
         self.output_blob = ['Identity:0']
         return
 
-    def inference(self: YoloV5TFOnnx, sess: Session) -> np.ndarray:
+    def inference(self: YoloTFOnnx, sess: Session) -> List[np.ndarray]:
         pred = self.sess.run(
             output_names=self.output_blob,
-            input_feed=sess.yolov5_input
+            input_feed=sess.yolo_input
         )
+        print(pred[0].shape)
+        # XXX: 後回し
         pred = np.squeeze(pred[0], 0).copy()
-        pred[:, :4] = pred[:, :4] * IMAGE_SIZE
+        pred[:, :4] = pred[:, :4] * IMAGE_SIZES[self.config.model]
         return pred
 
 
-class YoloV5TFLite(Framework):
-    def __init__(self: YoloV5TFLite, config: Config) -> None:
+class YoloTFLite(Framework):
+    def __init__(self: YoloTFLite, config: Config) -> None:
         super().__init__(config=config)
         path_model = f'{path_wt}/{config.model}_{config.quantize}.tflite'
         if not os.path.isfile(path_model):
@@ -53,8 +84,8 @@ class YoloV5TFLite(Framework):
         self.interpreter.allocate_tensors()
         input_details = self.interpreter.get_input_details()
         input_shape = input_details[0]['shape']
-        assert input_shape[1] == IMAGE_SIZE
-        assert input_shape[2] == IMAGE_SIZE
+        assert input_shape[1] == IMAGE_SIZES[self.config.model]
+        assert input_shape[2] == IMAGE_SIZES[self.config.model]
         self.input_name = 'images'
         self.input_index = input_details[0]['index']
         output_details = self.interpreter.get_output_details()
@@ -67,14 +98,14 @@ class YoloV5TFLite(Framework):
             ]
         return
 
-    def inference(self: YoloV5TFLite, sess: Session) -> np.ndarray:
+    def inference(self: YoloTFLite, sess: Session) -> List[np.ndarray]:
         self.interpreter.set_tensor(
             self.input_index,
-            sess.yolov5_input[self.input_name]
+            sess.yolo_input[self.input_name]
         )
         self.interpreter.invoke()
         if self.config.quantize == 'int8':
-            pred = list()
+            preds = list()
             for index, params in zip(
                 self.output_indexes, self.output_quant_params
             ):
@@ -82,19 +113,18 @@ class YoloV5TFLite(Framework):
                 out = (
                     raw.astype(np.float32) - params['zero_points']
                 ) * params['scales']
-                pred.append(out)
+                preds.append(out)
         else:
-            pred = [
+            preds = [
                 self.interpreter.get_tensor(x)
                 for x in self.output_indexes
             ]
-        pred = np.squeeze(pred[0], 0).copy()
-        pred[:, :4] = pred[:, :4] * IMAGE_SIZE
-        return pred
+        preds = [np.squeeze(x, 0).copy() for x in preds]
+        return preds
 
 
-class YoloV5TF(Framework):
-    def __init__(self: YoloV5TF, config: Config) -> None:
+class YoloTF(Framework):
+    def __init__(self: YoloTF, config: Config) -> None:
         super().__init__(config=config)
         path_pb = f'{path_wt}/{config.model}.pb'
         if not os.path.isfile(path_pb):
@@ -103,17 +133,18 @@ class YoloV5TF(Framework):
         self.input_name = 'images'
         return
 
-    def inference(self: YoloV5TF, sess: Session) -> np.ndarray:
+    def inference(self: YoloTF, sess: Session) -> List[np.ndarray]:
         pred = self.model(tf.convert_to_tensor(
-            sess.yolov5_input[self.input_name]
+            sess.yolo_input[self.input_name]
         ))
+        print(pred[0].shape)
         pred = tf.squeeze(pred[0]).numpy()
-        pred[:, :4] = pred[:, :4] * IMAGE_SIZE
+        pred[:, :4] = pred[:, :4] * IMAGE_SIZES[self.config.model]
         return pred
 
 
-class YoloV5OnnxTF(Framework):
-    def __init__(self: YoloV5OnnxTF, config: Config) -> None:
+class YoloOnnxTF(Framework):
+    def __init__(self: YoloOnnxTF, config: Config) -> None:
         super().__init__(config=config)
         path_weight = f'{path_wt}/onnx_tf_{config.model}'
         if not os.path.isdir(path_weight):
@@ -123,13 +154,13 @@ class YoloV5OnnxTF(Framework):
         self.input_name = 'images'
         return
 
-    def inference(self: YoloV5OnnxTF, sess: Session) -> np.ndarray:
+    def inference(self: YoloOnnxTF, sess: Session) -> List[np.ndarray]:
         pred = self.model(sess.yolov5_input[self.input_name])
         return np.squeeze(pred[0].numpy(), 0).copy()
 
 
-class YoloV5Vino(Framework):
-    def __init__(self: YoloV5Vino, config: Config) -> None:
+class YoloVino(Framework):
+    def __init__(self: YoloVino, config: Config) -> None:
         super().__init__(config=config)
         model = config.model
         if not os.path.isdir(f'{path_wt}/onnx_vino_{model}'):
@@ -142,22 +173,22 @@ class YoloV5Vino(Framework):
         assert len(input_blob) == 1 and input_blob[0] == 'images'
         self.input_name = input_blob[0]
         input_shape = net.input_info[self.input_name].input_data.shape
-        assert input_shape[2] == IMAGE_SIZE
-        assert input_shape[3] == IMAGE_SIZE
+        assert input_shape[2] == IMAGE_SIZES[self.config.model]
+        assert input_shape[3] == IMAGE_SIZES[self.config.model]
         output_blob = list(net.outputs.keys())
         assert 'output' in output_blob
         self.output_blob = ['output']
         self.exec_net = ie.load_network(network=net, device_name='CPU')
         return
 
-    def inference(self: YoloV5Vino, sess: Session) -> np.ndarray:
+    def inference(self: YoloVino, sess: Session) -> List[np.ndarray]:
         pred = self.exec_net.infer(inputs=sess.yolov5_input)
         pred = [pred[ob] for ob in self.output_blob]
         return np.squeeze(pred[0], 0).copy()
 
 
-class YoloV5Onnx(Framework):
-    def __init__(self: YoloV5Onnx, config: Config) -> None:
+class YoloOnnx(Framework):
+    def __init__(self: YoloOnnx, config: Config) -> None:
         super().__init__(config=config)
         path_model = f'{path_wt}/{config.model}.onnx'
         if not os.path.isfile(path_model):
@@ -167,14 +198,14 @@ class YoloV5Onnx(Framework):
         assert len(input_blob) == 1 and input_blob[0] == 'images'
         self.input_name = input_blob[0]
         input_shape = self.sess.get_inputs()[0].shape
-        assert input_shape[2] == IMAGE_SIZE
-        assert input_shape[3] == IMAGE_SIZE
+        assert input_shape[2] == IMAGE_SIZES[self.config.model]
+        assert input_shape[3] == IMAGE_SIZES[self.config.model]
         output_blob = [x.name for x in self.sess.get_outputs()]
         assert 'output' in output_blob
         self.output_blob = ['output']
         return
 
-    def inference(self: YoloV5Onnx, sess: Session) -> np.ndarray:
+    def inference(self: YoloOnnx, sess: Session) -> List[np.ndarray]:
         pred = self.sess.run(
             output_names=self.output_blob,
             input_feed=sess.yolov5_input
@@ -182,8 +213,8 @@ class YoloV5Onnx(Framework):
         return np.squeeze(pred[0], 0).copy()
 
 
-class YoloV5Torch(Framework):
-    def __init__(self: YoloV5Torch, config: Config) -> None:
+class YoloTorch(Framework):
+    def __init__(self: YoloTorch, config: Config) -> None:
         super().__init__(config=config)
         path_weight = f'{path_wt}/{config.model}.pt'
         if not os.path.isfile(path_weight):
@@ -198,7 +229,7 @@ class YoloV5Torch(Framework):
         self.input_name = 'images'
         return
 
-    def inference(self: YoloV5Torch, sess: Session) -> np.ndarray:
+    def inference(self: YoloTorch, sess: Session) -> List[np.ndarray]:
         input_feed = torch.from_numpy(
             sess.yolov5_input[self.input_name]
         ).to('cpu')
@@ -207,32 +238,25 @@ class YoloV5Torch(Framework):
         return np.squeeze(pred.detach().numpy(), 0).copy()
 
 
-class YoloV5(Model):
-    def __init__(self: YoloV5, config: Config) -> None:
+class Yolo(Model):
+    def __init__(self: Yolo, config: Config) -> None:
         super().__init__(config=config)
-        if config.framework == 'torch':
-            self.framework = YoloV5Torch(config=config)
-        elif config.framework == 'torch_onnx':
-            self.framework = YoloV5Onnx(config=config)
-        elif config.framework == 'onnx_vino':
-            self.framework = YoloV5Vino(config=config)
-        elif config.framework == 'onnx_tf':
-            self.framework = YoloV5OnnxTF(config=config)
-        elif config.framework == 'tf':
-            self.framework = YoloV5TF(config=config)
+        if config.framework == 'tf':
+            self.framework = YoloTF(config=config)
         elif config.framework == 'tflite':
-            self.framework = YoloV5TFLite(config=config)
+            self.framework = YoloTFLite(config=config)
         elif config.framework == 'tf_onnx':
-            self.framework = YoloV5TFOnnx(config=config)
+            self.framework = YoloTFOnnx(config=config)
         else:
             raise SystemError(
-                f'YOLO V5 unsupport {config.framework}'
+                f'YOLO unsupport {config.framework}'
             )
         return
 
-    def prep_image(self: YoloV5, sess: Session) -> None:
+    def prep_image(self: Yolo, sess: Session) -> None:
+        image_size = IMAGE_SIZES[self.config.model]
         sess.padding_image(
-            model_height=IMAGE_SIZE, model_width=IMAGE_SIZE
+            model_height=image_size, model_width=image_size
         )
         image = sess.pad_image
         # reshape image to throw it to the model
@@ -251,11 +275,64 @@ class YoloV5(Model):
         else:
             image = image.astype(np.float32)
             image /= 255.0
-        sess.yolov5_input = {self.framework.input_name: image}
+        sess.yolo_input = {self.framework.input_name: image}
         return
 
-    def inference(self: YoloV5, sess: Session) -> np.ndarray:
-        pred = super().inference(sess=sess)
+    @staticmethod
+    def sigmoid(x: np.ndarray) -> np.ndarray:
+        return 1.0 / (1.0 + np.exp(-x))
+
+    def apply_anchors(self: Yolo, preds: List[np.ndarray]) -> np.ndarray:
+        image_size = IMAGE_SIZES[self.config.model]
+        anchors = STRIDE_ANCHORS[self.config.model]
+        xyscales = STRIDE_XYSCALES[self.config.model]
+        applied = list()
+        for i, pred in enumerate(preds):
+            anchor_size = pred.shape[0]
+            stride = image_size // anchor_size
+            strides = [stride, stride]
+            anchor = anchors[stride]
+            xyscale = xyscales[stride]
+            pred = np.reshape(pred, (anchor_size, anchor_size, 3, 85))
+            # xy: min_x, min_y
+            # wh: width, height
+            # conf: confidence score of the bounding box
+            # prob: probability for each category
+            xy, wh, conf, prob = np.split(
+                pred, (2, 4, 5), axis=-1
+            )
+            # calc offset of each anchor box
+            anchor_offset = np.meshgrid(
+                np.arange(anchor_size), np.arange(anchor_size)
+            )
+            anchor_offset = np.expand_dims(
+                np.stack(anchor_offset, axis=-1), axis=2
+            )
+            anchor_offset = np.tile(
+                anchor_offset, [1, 1, 3, 1]
+            ).astype(np.float)
+            # apply anchor to xy
+            xy = (
+                (
+                    (self.sigmoid(xy) * xyscale) - (0.5 * (xyscale - 1))
+                ) + anchor_offset
+            ) * strides
+            # apply anchor to wh
+            wh = np.exp(wh) * anchor
+            # do sigmoid to probability
+            conf = self.sigmoid(conf)
+            prob = self.sigmoid(prob)
+            # concat
+            bbox = np.concatenate([xy, wh, conf, prob], axis=-1)
+            # expand all anchors
+            bbox = np.reshape(bbox, (-1, 85))
+            # done
+            applied.append(bbox)
+        return np.concatenate(applied, axis=0)
+
+    def inference(self: Yolo, sess: Session) -> np.ndarray:
+        preds = super().inference(sess=sess)
+        pred = self.apply_anchors(preds=preds)
         assert len(pred.shape) == 2
         assert pred.shape[1] == 85
         # xywh -> xyxy
@@ -271,6 +348,8 @@ class YoloV5(Model):
         prob = pred[:, 5:]
         # confidence score for each category = conf * prob
         cat_conf = conf * prob
+        if self.config.model == 'yolov3-tiny':
+            cat_conf = np.power(cat_conf, 0.3)
         # catgory of bouding box is the most plausible category
         cat = cat_conf.argmax(axis=1)[:, np.newaxis].astype(np.float)
         # confidence score of bbox is that of the most plausible category
@@ -279,8 +358,8 @@ class YoloV5(Model):
         return np.concatenate((xyxy, cat, conf), axis=1)
 
 
-class DetectorYoloV5(Detector):
-    def __init__(self: DetectorYoloV5, config: Config) -> None:
+class DetectorYolo(Detector):
+    def __init__(self: DetectorYolo, config: Config) -> None:
         super().__init__(config=config)
-        self.model = YoloV5(config=config)
+        self.model = Yolo(config=config)
         return

@@ -46,11 +46,11 @@ def bboxes_iou(bboxes1: np.ndarray, bboxes2: np.ndarray) -> np.ndarray:
 # paper of soft NMS: https://arxiv.org/abs/1704.04503
 # bboxes is numpy array of
 # offset 0-3: xyxy (xmin, ymin, xmax, ymax)
-# offset 4: class id (int)
-# offset 5: confidence
+# offset 4: category id (int)
+# offset 5: confidence score
 def filter_bboxes(
     bboxes: np.ndarray,
-    conf_threshold: float = 0.25,
+    conf_threshold: float = 0.3,
     iou_threshold: float = 0.45,
     is_soft: bool = True
 ) -> np.ndarray:
@@ -63,25 +63,25 @@ def filter_bboxes(
     # confidence for soft NMS
     bboxes = np.insert(bboxes, 6, bboxes[:, 5], axis=1)
     # (soft) NMS for each class
-    unique_class_ids = list(set(bboxes[:, 4]))
+    unique_category_ids = list(set(bboxes[:, 4]))
     best_bboxes = list()
-    for cls in unique_class_ids:
-        cls_bboxes = bboxes[bboxes[:, 4] == cls]
-        while cls_bboxes.shape[0] > 0:
-            if cls_bboxes.shape[0] == 1:
-                best_bboxes.append(cls_bboxes)
+    for cat in unique_category_ids:
+        cat_bboxes = bboxes[bboxes[:, 4] == cat]
+        while cat_bboxes.shape[0] > 0:
+            if cat_bboxes.shape[0] == 1:
+                best_bboxes.append(cat_bboxes)
                 break
-            max_conf = np.argmax(cls_bboxes[:, 6])
-            best_bbox = cls_bboxes[max_conf:max_conf + 1]
+            max_conf = np.argmax(cat_bboxes[:, 6])
+            best_bbox = cat_bboxes[max_conf:max_conf + 1]
             best_bboxes.append(best_bbox)
-            cls_bboxes = np.delete(cls_bboxes, max_conf, axis=0)
-            ious = bboxes_iou(best_bbox, cls_bboxes)
+            cat_bboxes = np.delete(cat_bboxes, max_conf, axis=0)
+            ious = bboxes_iou(best_bbox, cat_bboxes)
             if is_soft:
                 iou_mask = (ious >= iou_threshold).astype(np.float)
-                cls_bboxes[:, 6] = cls_bboxes[:, 6] * (
+                cat_bboxes[:, 6] = cat_bboxes[:, 6] * (
                     1.0 - (ious * iou_mask)
                 )
-                cls_bboxes = cls_bboxes[cls_bboxes[:, 6] > conf_threshold]
+                cat_bboxes = cat_bboxes[cat_bboxes[:, 6] > conf_threshold]
             else:
-                cls_bboxes = cls_bboxes[ious < iou_threshold]
+                cat_bboxes = cat_bboxes[ious < iou_threshold]
     return np.concatenate(best_bboxes, axis=0)[:, :6]
