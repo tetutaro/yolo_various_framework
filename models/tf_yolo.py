@@ -9,10 +9,13 @@ from tensorflow.keras.layers import (
     ZeroPadding2D, MaxPool2D,
     Add, Lambda
 )
+from tensorflow.keras.activations import sigmoid
 from tensorflow_addons.activations import mish
 
 
 class WeightedLayer(object):
+    '''class for copying darknet weights
+    '''
     def __init__(
         self: WeightedLayer,
         stride: int,
@@ -26,11 +29,11 @@ class WeightedLayer(object):
         return
 
     def __str__(self: WeightedLayer) -> str:
-        if self.norm is None:
-            bn = 0
-        else:
-            bn = 1
         rets = list()
+        if self.norm.__class__.__name__ == 'BatchNormalization':
+            bn = 1
+        else:
+            bn = 0
         rets.append(f'bn={bn}')
         rets.append(f'filters={self.conv.filters}')
         rets.append(f'size={self.conv.kernel_size[0]}')
@@ -87,6 +90,10 @@ class DarknetConv(Layer):
         elif act and actfunc == 'mish':
             self.act = Lambda(
                 lambda x: mish(x)
+            )
+        elif act and actfunc == 'sigmoid':
+            self.act = Lambda(
+                lambda x: sigmoid(x)
             )
         else:
             self.act = tf.identity
@@ -151,6 +158,8 @@ class DarknetBlock(Layer):
 
 
 class Darknet53_tiny(Layer):
+    '''backbone of YoloV3_tiny
+    '''
     def __init__(self: Darknet53_tiny) -> None:
         super().__init__()
         self.weighted_layers = list()
@@ -176,10 +185,7 @@ class Darknet53_tiny(Layer):
         self.weighted_layers.extend(self.dc6.weighted_layers)
         return
 
-    def call(
-        self: Darknet53_tiny,
-        x: tf.Tensor
-    ) -> Tuple[tf.Tensor, tf.Tensor]:
+    def call(self: Darknet53_tiny, x: tf.Tensor) -> Tuple[tf.Tensor]:
         x = self.dc4(self.mp4(
             self.dc3(self.mp3(
                 self.dc2(self.mp2(
@@ -193,8 +199,7 @@ class Darknet53_tiny(Layer):
 
 
 class Darknet53(Layer):
-    '''YOLOv3
-    https://arxiv.org/abs/1804.02767
+    '''backbone of YOLOv3
     '''
     def __init__(self: Darknet53) -> None:
         super().__init__()
@@ -213,16 +218,79 @@ class Darknet53(Layer):
         self.weighted_layers.extend(self.db5.weighted_layers)
         return
 
-    def call(
-        self: Darknet53,
-        x: tf.Tensor
-    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+    def call(self: Darknet53, x: tf.Tensor) -> Tuple[tf.Tensor]:
         x = self.db3(self.db2(self.db1(self.dc(x))))
         x_36 = x
         x = self.db4(x)
         x_61 = x
         x = self.db5(x)
         return x_36, x_61, x
+
+
+class DarknetBlock_CSPnet_tiny(Layer):
+    def __init__(self: DarknetBlock_CSPnet_tiny, fil: int) -> None:
+        super().__init__()
+        self.weighted_layers = list()
+        hidden_fil = fil // 2
+        self.dc1 = DarknetConv(fil=fil, ksize=3)
+        self.weighted_layers.extend(self.dc1.weighted_layers)
+        self.dc2 = DarknetConv(fil=hidden_fil, ksize=3)
+        self.weighted_layers.extend(self.dc2.weighted_layers)
+        self.dc3 = DarknetConv(fil=hidden_fil, ksize=3)
+        self.weighted_layers.extend(self.dc3.weighted_layers)
+        self.dc4 = DarknetConv(fil=fil, ksize=1)
+        self.weighted_layers.extend(self.dc4.weighted_layers)
+        self.mp = MaxPool2D(pool_size=2, strides=2, padding='SAME')
+        return
+
+    def call(
+        self: DarknetBlock_CSPnet_tiny,
+        x: tf.Tensor
+    ) -> Tuple[tf.Tensor]:
+        x = self.dc1(x)
+        route_1 = x
+        x = tf.split(x, num_or_size_splits=2, axis=-1)[1]
+        x = self.dc2(x)
+        route_2 = x
+        x = self.dc3(x)
+        x = tf.concat([x, route_2], axis=-1)
+        x = self.dc4(x)
+        route_3 = x
+        x = tf.concat([route_1, x], axis=-1)
+        x = self.mp(x)
+        return route_3, x
+
+
+class Darknet53_CSPnet_tiny(Layer):
+    '''backbone of YOLOv4 tiny
+    '''
+    def __init__(self: Darknet53_CSPnet_tiny) -> None:
+        super().__init__()
+        self.weighted_layers = list()
+        self.dc1 = DarknetConv(fil=32, ksize=3, ds=True)
+        self.weighted_layers.extend(self.dc1.weighted_layers)
+        self.dc2 = DarknetConv(fil=64, ksize=3, ds=True)
+        self.weighted_layers.extend(self.dc2.weighted_layers)
+        self.db1 = DarknetBlock_CSPnet_tiny(fil=64)
+        self.weighted_layers.extend(self.db1.weighted_layers)
+        self.db2 = DarknetBlock_CSPnet_tiny(fil=128)
+        self.weighted_layers.extend(self.db2.weighted_layers)
+        self.db3 = DarknetBlock_CSPnet_tiny(fil=256)
+        self.weighted_layers.extend(self.db3.weighted_layers)
+        self.dc3 = DarknetConv(fil=512, ksize=3)
+        self.weighted_layers.extend(self.dc3.weighted_layers)
+        return
+
+    def call(
+        self: Darknet53_CSPnet_tiny,
+        x: tf.Tensor
+    ) -> Tuple[tf.Tensor]:
+        x = self.dc2(self.dc1(x))
+        _, x = self.db1(x)
+        _, x = self.db2(x)
+        route, x = self.db3(x)
+        x = self.dc3(x)
+        return route, x
 
 
 class DarknetBlock_CSPnet(Layer):
@@ -300,8 +368,7 @@ class SPP(Layer):
 
 
 class Darknet53_CSPnet(Layer):
-    '''YOLOv4
-    https://arxiv.org/abs/2004.10934
+    '''backbone of YOLOv4
     '''
     def __init__(self: Darknet53_CSPnet) -> None:
         super().__init__()
@@ -332,10 +399,7 @@ class Darknet53_CSPnet(Layer):
         self.weighted_layers.extend(self.spp.weighted_layers)
         return
 
-    def call(
-        self: Darknet53_CSPnet,
-        x: tf.Tensor
-    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+    def call(self: Darknet53_CSPnet, x: tf.Tensor) -> Tuple[tf.Tensor]:
         x = self.db3(self.db2(self.db1(self.dc(x))))
         x_54 = x
         x = self.db4(x)
@@ -345,13 +409,20 @@ class Darknet53_CSPnet(Layer):
 
 
 class YoloLayer(Layer):
-    def __init__(self: YoloLayer, fil: int, nc: int) -> None:
+    def __init__(
+        self: YoloLayer,
+        fil: int,
+        nc: int,
+        act: bool = False
+    ) -> None:
         super().__init__()
         self.weighted_layers = list()
         fil2 = 3 * (nc + 5)
         self.dc1 = DarknetConv(fil=fil, ksize=3)
         self.weighted_layers.extend(self.dc1.weighted_layers)
-        self.dc2 = DarknetConv(fil=fil2, ksize=1, act=False, bn=False)
+        self.dc2 = DarknetConv(
+            fil=fil2, ksize=1, act=act, actfunc='sigmoid', bn=False
+        )
         self.weighted_layers.extend(self.dc2.weighted_layers)
         return
 
@@ -370,6 +441,25 @@ class UpSampling(Layer):
     def call(self: UpSampling, x: tf.Tensor) -> tf.Tensor:
         double_shape = (x.shape[1] * 2, x.shape[2] * 2)
         return tf.image.resize(self.dc(x), double_shape, method='nearest')
+
+
+class DarknetConvSeq(Layer):
+    def __init__(self: DarknetConvSeq, fil: int) -> None:
+        super().__init__()
+        self.weighted_layers = list()
+        dcs = list()
+        dcs.append(DarknetConv(fil=fil, ksize=1))
+        dcs.append(DarknetConv(fil=fil * 2, ksize=3))
+        dcs.append(DarknetConv(fil=fil, ksize=1))
+        dcs.append(DarknetConv(fil=fil * 2, ksize=3))
+        dcs.append(DarknetConv(fil=fil, ksize=1))
+        self.dcs = tf.keras.Sequential(dcs)
+        for dc in self.dcs.layers:
+            self.weighted_layers.extend(dc.weighted_layers)
+        return
+
+    def call(self: DarknetConvSeq, x: tf.Tensor) -> tf.Tensor:
+        return self.dcs(x)
 
 
 class tf_YoloV3_tiny(tf.keras.Model):
@@ -398,26 +488,9 @@ class tf_YoloV3_tiny(tf.keras.Model):
         return middle_bbox, large_bbox
 
 
-class DarknetConvSeq(Layer):
-    def __init__(self: DarknetConvSeq, fil: int) -> None:
-        super().__init__()
-        self.weighted_layers = list()
-        dcs = list()
-        dcs.append(DarknetConv(fil=fil, ksize=1))
-        dcs.append(DarknetConv(fil=fil * 2, ksize=3))
-        dcs.append(DarknetConv(fil=fil, ksize=1))
-        dcs.append(DarknetConv(fil=fil * 2, ksize=3))
-        dcs.append(DarknetConv(fil=fil, ksize=1))
-        self.dcs = tf.keras.Sequential(dcs)
-        for dc in self.dcs.layers:
-            self.weighted_layers.extend(dc.weighted_layers)
-        return
-
-    def call(self: DarknetConvSeq, x: tf.Tensor) -> tf.Tensor:
-        return self.dcs(x)
-
-
 class tf_YoloV3(tf.keras.Model):
+    '''https://arxiv.org/abs/1804.02767
+    '''
     def __init__(self: tf_YoloV3, nc: int) -> None:
         super().__init__()
         self.weighted_layers = list()
@@ -454,7 +527,35 @@ class tf_YoloV3(tf.keras.Model):
         return small_bbox, middle_bbox, large_bbox
 
 
+class tf_YoloV4_tiny(tf.keras.Model):
+    def __init__(self: tf_YoloV4_tiny, nc: int) -> None:
+        super().__init__()
+        self.weighted_layers = list()
+        self.net = Darknet53_CSPnet_tiny()
+        self.weighted_layers.extend(self.net.weighted_layers)
+        self.dc = DarknetConv(fil=256, ksize=1)
+        self.weighted_layers.extend(self.dc.weighted_layers)
+        self.yl1 = YoloLayer(fil=512, nc=nc)
+        self.weighted_layers.extend(self.yl1.weighted_layers)
+        self.us = UpSampling(fil=128)
+        self.weighted_layers.extend(self.us.weighted_layers)
+        self.yl2 = YoloLayer(fil=256, nc=nc)
+        self.weighted_layers.extend(self.yl2.weighted_layers)
+        return
+
+    def call(self: tf_YoloV3, inputs: tf.Tensor) -> Tuple[tf.Tensor]:
+        route, x = self.net(inputs)
+        x = self.dc(x)
+        large_bbox = self.yl1(x)
+        x = self.us(x)
+        x = tf.concat([x, route], axis=-1)
+        middle_bbox = self.yl2(x)
+        return middle_bbox, large_bbox
+
+
 class tf_YoloV4(tf.keras.Model):
+    '''https://arxiv.org/abs/2004.10934
+    '''
     def __init__(self: tf_YoloV4, nc: int) -> None:
         super().__init__()
         self.weighted_layers = list()

@@ -30,7 +30,21 @@ STRIDE_ANCHORS = {
         16: [(30, 61), (62, 45), (59, 119)],
         32: [(116, 90), (156, 198), (373, 326)],
     },
+    'yolov4-tiny': {
+        16: [(10, 14), (23, 27), (37, 58)],
+        32: [(81, 82), (135, 169), (344, 319)],
+    },
     'yolov4': {
+        8: [(12, 16), (19, 36), (40, 28)],
+        16: [(36, 75), (76, 55), (72, 146)],
+        32: [(142, 110), (192, 243), (459, 401)],
+    },
+    'yolov4-csp': {
+        8: [(12, 16), (19, 36), (40, 28)],
+        16: [(36, 75), (76, 55), (72, 146)],
+        32: [(142, 110), (192, 243), (459, 401)],
+    },
+    'yolov4x-mish': {
         8: [(12, 16), (19, 36), (40, 28)],
         16: [(36, 75), (76, 55), (72, 146)],
         32: [(142, 110), (192, 243), (459, 401)],
@@ -39,7 +53,10 @@ STRIDE_ANCHORS = {
 STRIDE_XYSCALES = {
     'yolov3-tiny': {16: 1.0, 32: 1.0},
     'yolov3': {8: 1.0, 16: 1.0, 32: 1.0},
+    'yolov4-tiny': {16: 1.05, 32: 1.05},
     'yolov4': {8: 1.05, 16: 1.1, 32: 1.2},
+    'yolov4-csp': {8: 2.0, 16: 2.0, 32: 2.0},
+    'yolov4x-mish': {8: 2.0, 16: 2.0, 32: 2.0},
 }
 path_wt = 'weights/yolo'
 
@@ -125,7 +142,7 @@ class YoloTF(Framework):
         if not os.path.isfile(path_pb):
             raise SystemError(f'pb({path_pb}) not found')
         inputs = ['x:0']
-        if config.model in ['yolov3-tiny']:
+        if config.model in ['yolov3-tiny', 'yolov4-tiny']:
             outputs = ['Identity:0', 'Identity_1:0']
         else:
             outputs = ['Identity:0', 'Identity_1:0', 'Identity_2:0']

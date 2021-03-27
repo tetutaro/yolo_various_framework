@@ -5,7 +5,12 @@ import tensorflow as tf
 import os
 import numpy as np
 # YOLO V3, V4
-from models.tf_yolo import tf_YoloV3_tiny, tf_YoloV3, tf_YoloV4
+from models.tf_yolo import (
+    tf_YoloV3_tiny,
+    tf_YoloV3,
+    tf_YoloV4_tiny,
+    tf_YoloV4,
+)
 from utils.convert_tflite import (
     save_frozen_graph,
     convert_tflite_fp32,
@@ -17,6 +22,7 @@ NUM_CLASS = 80
 MODEL_CLASS = {
     'yolov3-tiny': tf_YoloV3_tiny,
     'yolov3': tf_YoloV3,
+    'yolov4-tiny': tf_YoloV4_tiny,
     'yolov4': tf_YoloV4,
 }
 MODEL_SHAPE = {
@@ -27,6 +33,10 @@ MODEL_SHAPE = {
     'yolov3': {
         'nlayers': 75,
         'nobn_layers': [58, 66, 74],
+    },
+    'yolov4-tiny': {
+        'nlayers': 21,
+        'nobn_layers': [17, 20],
     },
     'yolov4': {
         'nlayers': 110,
@@ -48,10 +58,11 @@ def _load_darknet_weights(
     nlayers = MODEL_SHAPE[model]['nlayers']
     nobn_layers = MODEL_SHAPE[model]['nobn_layers']
     j = 0
+    if DEBUG:
+        for i, layers in enumerate(model_keras.weighted_layers):
+            print(i, layers)
     assert len(model_keras.weighted_layers) == nlayers
     for i, layers in enumerate(model_keras.weighted_layers):
-        if DEBUG:
-            print(i, layers)
         conv_layer = layers.conv
         norm_layer = layers.norm
         input_shape = layers.input_shape

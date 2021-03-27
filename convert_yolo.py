@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-# from convertor.yolo.convert_onnx import yolo_convert_onnx
+# from convertor.yolo.convert_torch_onnx import yolo_convert_torch_onnx
 # from convertor.yolo.convert_onnx_vino import yolo_convert_onnx_vino
 # from convertor.yolo.convert_onnx_tf import yolo_convert_onnx_tf
 from convertor.yolo.convert_tf_tflite import yolo_convert_tf_tflite
@@ -19,12 +19,11 @@ DIRECTORY = 'weights/yolo'
 
 if __name__ == '__main__':
     for model in [
-        'yolov3-tiny', 'yolov3', 'yolov4'
-        # 'yolov3-tiny', 'yolov3',
-        # 'yolov4-tiny', 'yolov4', 'yolov4-csp', 'yolov4x-mish'
+        'yolov3-tiny', 'yolov3', 'yolov4-tiny', 'yolov4',
+        # yolov4-csp', 'yolov4x-mish'
     ]:
         imgsize = IMAGE_SIZES[model]
-        # yolo_convert_onnx(
+        # yolo_convert_torch_onnx(
         #     model=model,
         #     directory=DIRECTORY,
         #     imgsize=[imgsize, imgsize]

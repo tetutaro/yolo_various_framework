@@ -21,7 +21,7 @@ run YOLO (object detection model) on various platforms and compare them
         - input image size: 512x512
     - yolov4
         - input image size: 512x512
-    - yolov4-csp
+    - yolov4-csp (Scaled-YOLOv4)
         - input image size: 640x640
     - yolov4x-mish
         - input image size: 640x640

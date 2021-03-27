@@ -1,8 +1,10 @@
 numpy
+matplotlib
+requests
 opencv-contrib-python
 Pillow
-simplejson
 torch
+torchvision
 tensorflow
 tensorflow-addons
 onnx
@@ -10,3 +12,5 @@ onnxruntime
 onnx-tf
 tf2onnx
 PyYAML
+simplejson
+tqdm
