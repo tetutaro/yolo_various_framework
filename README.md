@@ -84,7 +84,8 @@ usage: detect.py [-h]
     -m {yolov3-tiny,yolov3,yolov4-tiny,yolov4,yolov4-csp,yolov4x-mish,yolov5s,yolov5m,yolov5l,yolov5x}
     -f {torch,torch_onnx,onnx_vino,onnx_tf,tf,tflite,tf_onnx}
     [-q {fp32,fp16,int8}]
-    -d IMAGE_DIR [-c CONF_THRESHOLD]
+    -d IMAGE_DIR
+    [-c CONF_THRESHOLD]
     [-i IOU_THRESHOLD]
     [--disable-clarify-image]
     [--disable-use-superres]

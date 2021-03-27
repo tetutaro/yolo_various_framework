@@ -72,7 +72,6 @@ def _load_darknet_weights(
             )
         # darknet shape (out_dim, in_dim, height, width)
         conv_shape = (filters, in_dim, k_size, k_size)
-        print(filters, in_dim, k_size, k_size)
         conv_weights = np.fromfile(
             rf, dtype=np.float32, count=np.product(conv_shape)
         )

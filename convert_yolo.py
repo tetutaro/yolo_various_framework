@@ -19,8 +19,7 @@ DIRECTORY = 'weights/yolo'
 
 if __name__ == '__main__':
     for model in [
-        'yolov4'
-        # 'yolov3-tiny', 'yolov3', 'yolov4'
+        'yolov3-tiny', 'yolov3', 'yolov4'
         # 'yolov3-tiny', 'yolov3',
         # 'yolov4-tiny', 'yolov4', 'yolov4-csp', 'yolov4x-mish'
     ]:

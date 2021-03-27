@@ -57,21 +57,16 @@ class YoloTFOnnx(Framework):
         input_shape = self.sess.get_inputs()[0].shape
         assert input_shape[2] == IMAGE_SIZES[self.config.model]
         assert input_shape[3] == IMAGE_SIZES[self.config.model]
-        output_blob = [x.name for x in self.sess.get_outputs()]
-        assert 'Identity:0' in output_blob
-        self.output_blob = ['Identity:0']
+        self.output_blob = [x.name for x in self.sess.get_outputs()]
         return
 
     def inference(self: YoloTFOnnx, sess: Session) -> List[np.ndarray]:
-        pred = self.sess.run(
+        preds = self.sess.run(
             output_names=self.output_blob,
             input_feed=sess.yolo_input
         )
-        print(pred[0].shape)
-        # XXX: 後回し
-        pred = np.squeeze(pred[0], 0).copy()
-        pred[:, :4] = pred[:, :4] * IMAGE_SIZES[self.config.model]
-        return pred
+        preds = [np.squeeze(x, 0).copy() for x in preds]
+        return preds
 
 
 class YoloTFLite(Framework):
@@ -129,18 +124,25 @@ class YoloTF(Framework):
         path_pb = f'{path_wt}/{config.model}.pb'
         if not os.path.isfile(path_pb):
             raise SystemError(f'pb({path_pb}) not found')
-        self.model = load_frozen_graph(path_pb=path_pb)
+        inputs = ['x:0']
+        if config.model in ['yolov3-tiny']:
+            outputs = ['Identity:0', 'Identity_1:0']
+        else:
+            outputs = ['Identity:0', 'Identity_1:0', 'Identity_2:0']
+        self.model = load_frozen_graph(
+            path_pb=path_pb,
+            inputs=inputs,
+            outputs=outputs
+        )
         self.input_name = 'images'
         return
 
     def inference(self: YoloTF, sess: Session) -> List[np.ndarray]:
-        pred = self.model(tf.convert_to_tensor(
+        preds = self.model(tf.convert_to_tensor(
             sess.yolo_input[self.input_name]
         ))
-        print(pred[0].shape)
-        pred = tf.squeeze(pred[0]).numpy()
-        pred[:, :4] = pred[:, :4] * IMAGE_SIZES[self.config.model]
-        return pred
+        preds = [tf.squeeze(x).numpy() for x in preds]
+        return preds
 
 
 class YoloOnnxTF(Framework):

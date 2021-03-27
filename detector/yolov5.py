@@ -99,7 +99,11 @@ class YoloV5TF(Framework):
         path_pb = f'{path_wt}/{config.model}.pb'
         if not os.path.isfile(path_pb):
             raise SystemError(f'pb({path_pb}) not found')
-        self.model = load_frozen_graph(path_pb=path_pb)
+        self.model = load_frozen_graph(
+            path_pb=path_pb,
+            inputs=['x:0'],
+            outputs=['Identity:0']
+        )
         self.input_name = 'images'
         return
 

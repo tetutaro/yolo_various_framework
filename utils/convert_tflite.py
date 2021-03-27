@@ -45,7 +45,11 @@ def save_frozen_graph(
     return
 
 
-def load_frozen_graph(path_pb: str) -> tf.function:
+def load_frozen_graph(
+    path_pb: str,
+    inputs: List[str],
+    outputs: List[str]
+) -> tf.function:
     with tf.io.gfile.GFile(path_pb, "rb") as rf:
         graph_def = tf.compat.v1.GraphDef()
         graph_def.ParseFromString(rf.read())
@@ -66,9 +70,7 @@ def load_frozen_graph(path_pb: str) -> tf.function:
     # the name of inputs and outputs can be known with printing
     # frozen_func.inputs/outputs when `save_frozen_graph()`
     frozen_func = wrap_frozen_graph(
-        graph_def=graph_def,
-        inputs=['x:0'],
-        outputs=['Identity:0']
+        graph_def=graph_def, inputs=inputs, outputs=outputs
     )
     return frozen_func
 
