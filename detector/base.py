@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 from __future__ import annotations
-from typing import Generator, Dict
+from typing import Generator, Dict, Optional
 import os
 import time
 import glob
@@ -9,9 +9,18 @@ import subprocess
 import simplejson as json
 import numpy as np
 import cv2
+from cv2 import dnn_superres, dnn_superres_DnnSuperResImpl
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.cm as cm
 from utils.nms import filter_bboxes
+from utils.image_preproc import (
+    adjust_white_balance,
+    smooth_image,
+    correct_contrast,
+    upsample_image,
+    # levelize_histogram,
+    # correct_contrast_using_lut,
+)
 
 ld_library_path = subprocess.Popen(
     'pyenv which python', stdout=subprocess.PIPE, shell=True
@@ -22,9 +31,16 @@ os.environ['LD_LIBRARY_PATH'] = ld_library_path
 
 
 class Session(object):
-    def __init__(self: Session, path: str) -> None:
+    def __init__(
+        self: Session,
+        path: str,
+        disable_clarify_image: bool = False,
+        disable_use_superres: bool = False
+    ) -> None:
         self.name = os.path.basename(path)
         self.image_id = os.path.splitext(self.name)[0]
+        self.disable_clarify_image = disable_clarify_image
+        self.disable_use_superres = disable_use_superres
         self.raw_image = cv2.imread(path)
         self.raw_height = self.raw_image.shape[0]
         self.raw_width = self.raw_image.shape[1]
@@ -43,6 +59,25 @@ class Session(object):
         self.elapsed_ms = None
         self.pred_count = None
         self.pred_bboxes = None
+        return
+
+    def clarify_image(
+        self: Session,
+        sr: Optional[dnn_superres_DnnSuperResImpl]
+    ) -> None:
+        if self.disable_clarify_image:
+            return
+        image = self.fine_image
+        image = adjust_white_balance(image)
+        image = smooth_image(image)
+        image = correct_contrast(image)
+        if not self.disable_use_superres:
+            assert sr is not None
+            image = upsample_image(image, sr)
+        # stop using below functions
+        # image = levelize_histogram(image)
+        # image = correct_contrast_using_lut(image)
+        self.fine_image = image
         return
 
     def padding_image(
@@ -165,6 +200,10 @@ class Config(object):
         image_dir: str,
         conf_threshold: float,
         iou_threshold: float,
+        disable_clarify_image: bool,
+        disable_use_superres: bool,
+        disable_soft_nms: bool,
+        disable_iou_subset: bool
     ) -> None:
         self.model = model
         self.framework = framework
@@ -172,6 +211,10 @@ class Config(object):
         self.image_dir = image_dir
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
+        self.disable_clarify_image = disable_clarify_image
+        self.disable_use_superres = disable_use_superres
+        self.disable_soft_nms = disable_soft_nms
+        self.disable_iou_subset = disable_iou_subset
         return
 
 
@@ -239,6 +282,11 @@ class Detector(object):
                 dataset_name, config.model, config.framework
             )
         os.makedirs(self.result_dir, exist_ok=True)
+        self.sr = None
+        if not config.disable_use_superres:
+            self.sr = dnn_superres.DnnSuperResImpl_create()
+            self.sr.readModel('superres/ESPCN_x4.pb')
+            self.sr.setModel('espcn', 4)
         self.wf = open(os.path.join(
             self.result_dir, 'predictions.jsonl'
         ), 'wt')
@@ -260,10 +308,15 @@ class Detector(object):
         for path in sorted(glob.glob(f'{self.config.image_dir}/*')):
             if not path.endswith(('.jpg', '.png')):
                 continue
-            yield Session(path=path)
+            yield Session(
+                path=path,
+                disable_clarify_image=self.config.disable_clarify_image,
+                disable_use_superres=self.config.disable_use_superres
+            )
         return
 
     def prep_image(self: Detector, sess: Session) -> None:
+        sess.clarify_image(sr=self.sr)
         self.model.prep_image(sess=sess)
         return
 
@@ -277,7 +330,8 @@ class Detector(object):
             pred,
             conf_threshold=self.config.conf_threshold,
             iou_threshold=self.config.iou_threshold,
-            is_soft=True
+            disable_soft_nms=self.config.disable_soft_nms,
+            disable_iou_subset=self.config.disable_iou_subset
         )
         end_time = time.perf_counter()
         # sort bounding boxes by confidence ascending

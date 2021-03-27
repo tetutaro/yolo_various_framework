@@ -280,6 +280,8 @@ class Yolo(Model):
 
     @staticmethod
     def sigmoid(x: np.ndarray) -> np.ndarray:
+        sigmoid_range = 34.538776394910684
+        x = np.clip(x, -sigmoid_range, sigmoid_range)
         return 1.0 / (1.0 + np.exp(-x))
 
     def apply_anchors(self: Yolo, preds: List[np.ndarray]) -> np.ndarray:

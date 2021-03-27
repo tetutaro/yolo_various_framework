@@ -64,8 +64,9 @@ all deep learing platforms below were ran on Python 3.7.9
 
 ## preparation
 
-- download font for detector
+- download font and trained model of super-resolution for detector
     - `./download_font.sh`
+    - `./download_superres.sh`
 - download COCO dataset and create small dataset (convert annotations)
     - see datasets/README
 - download pre-trained weights
@@ -79,5 +80,41 @@ all deep learing platforms below were ran on Python 3.7.9
 ## usage
 
 ```
-detect.py
+usage: detect.py [-h]
+    -m {yolov3-tiny,yolov3,yolov4-tiny,yolov4,yolov4-csp,yolov4x-mish,yolov5s,yolov5m,yolov5l,yolov5x}
+    -f {torch,torch_onnx,onnx_vino,onnx_tf,tf,tflite,tf_onnx}
+    [-q {fp32,fp16,int8}]
+    -d IMAGE_DIR [-c CONF_THRESHOLD]
+    [-i IOU_THRESHOLD]
+    [--disable-clarify-image]
+    [--disable-use-superres]
+    [--disable-soft-nms]
+    [--disable-iou-subset]
+
+detect objects from images
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -m MODEL, --model MODEL
+                        model name
+  -f FRAMEWORK, --framework FRAMEWORK
+                        framework
+  -q QUANTIZE, --quantize QUANTIZE
+                        quantization mode (TensorFlow Lite only)
+                        default: fp32
+  -d IMAGE_DIR, --image-dir IMAGE_DIR
+                        directory contains images to detect objects
+  -c CONF_THRESHOLD, --conf-threshold CONF_THRESHOLD
+                        threshold of confidence score to adopt bounding boxes
+                        default: 0.3
+  -i IOU_THRESHOLD, --iou-threshold IOU_THRESHOLD
+                        threshold of IoU to eliminte bounding boxes in NMS
+                        default: 0.45
+  --disable-clarify-image
+                        disable image preprocessing
+  --disable-use-superres
+                        disable using Super-Resolution at image preprocessing
+  --disable-soft-nms    use hard-NMS instead of soft-NMS
+  --disable-iou-subset  do not eliminate small and unconfident bounding box
+                        which is inside of big and confident bounding box
 ```

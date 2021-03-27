@@ -31,7 +31,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-m', '--model', type=str, required=True, choices=[
             'yolov3-tiny', 'yolov3',
-            'yolov4',
+            'yolov4-tiny', 'yolov4', 'yolov4-csp', 'yolov4x-mish',
             'yolov5s', 'yolov5m', 'yolov5l', 'yolov5x',
         ], help='model name'
     )
@@ -48,15 +48,34 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '-d', '--image-dir', type=str, required=True,
-        help='directory contains images to detect'
+        help='directory contains images to detect objects'
     )
     parser.add_argument(
         '-c', '--conf-threshold', type=float, default=0.3,
-        help='threshold of confidence score to adopt a bounding box'
+        help='threshold of confidence score to adopt bounding boxes'
     )
     parser.add_argument(
         '-i', '--iou-threshold', type=float, default=0.45,
-        help='threshold of IoU to reject a bounding box in NMS'
+        help='threshold of IoU to eliminte bounding boxes in NMS'
+    )
+    parser.add_argument(
+        '--disable-clarify-image', action='store_true',
+        help='disable image preprocessing'
+    )
+    parser.add_argument(
+        '--disable-use-superres', action='store_true',
+        help='disable using Super-Resolution at image preprocessing'
+    )
+    parser.add_argument(
+        '--disable-soft-nms', action='store_true',
+        help='use hard-NMS instead of soft-NMS'
+    )
+    parser.add_argument(
+        '--disable-iou-subset', action='store_true',
+        help=(
+            'do not eliminate small and unconfident bounding box'
+            ' which is inside of big and confident bounding box'
+        )
     )
     args = parser.parse_args()
     if not os.path.isdir(args.image_dir):

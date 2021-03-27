@@ -1,6 +1,10 @@
 numpy
+opencv-contrib-python
+Pillow
 simplejson
 torch
+tensorflow
+tensorflow-addons
 onnx
 onnxruntime
 onnx-tf
