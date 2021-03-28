@@ -9,6 +9,9 @@ fi
 if [ ! -f yolo/yolov3.weights ] ; then
     wget -O yolo/yolov3.weights https://pjreddie.com/media/files/yolov3.weights
 fi
+if [ ! -f yolo/yolov3-spp.weights ] ; then
+    wget -O yolo/yolov3-spp.weights https://pjreddie.com/media/files/yolov3-spp.weights
+fi
 if [ ! -f yolo/yolov4-tiny.weights ] ; then
     wget -O yolo/yolov4-tiny.weights https://github.com/AlexeyAB/darknet/releases/download/darknet_yolo_v4_pre/yolov4-tiny.weights
 fi

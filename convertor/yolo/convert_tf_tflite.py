@@ -8,6 +8,7 @@ import numpy as np
 from models.tf_yolo import (
     tf_YoloV3_tiny,
     tf_YoloV3,
+    tf_YoloV3_spp,
     tf_YoloV4_tiny,
     tf_YoloV4,
 )
@@ -22,6 +23,7 @@ NUM_CLASS = 80
 MODEL_CLASS = {
     'yolov3-tiny': tf_YoloV3_tiny,
     'yolov3': tf_YoloV3,
+    'yolov3-spp': tf_YoloV3_spp,
     'yolov4-tiny': tf_YoloV4_tiny,
     'yolov4': tf_YoloV4,
 }
@@ -34,6 +36,10 @@ MODEL_SHAPE = {
         'nlayers': 75,
         'nobn_layers': [58, 66, 74],
     },
+    'yolov3-spp': {
+        'nlayers': 76,
+        'nobn_layers': [59, 67, 75],
+    },
     'yolov4-tiny': {
         'nlayers': 21,
         'nobn_layers': [17, 20],
@@ -43,7 +49,7 @@ MODEL_SHAPE = {
         'nobn_layers': [93, 101, 109],
     },
 }
-DEBUG = False
+DEBUG = True
 
 
 def _load_darknet_weights(
@@ -59,6 +65,7 @@ def _load_darknet_weights(
     nobn_layers = MODEL_SHAPE[model]['nobn_layers']
     j = 0
     if DEBUG:
+        print(model)
         for i, layers in enumerate(model_keras.weighted_layers):
             print(i, layers)
     assert len(model_keras.weighted_layers) == nlayers

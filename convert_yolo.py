@@ -9,6 +9,7 @@ from convertor.yolo.convert_tf_onnx import yolo_convert_tf_onnx
 IMAGE_SIZES = {
     'yolov3-tiny': 512,
     'yolov3': 512,
+    'yolov3-spp': 512,
     'yolov4-tiny': 512,
     'yolov4': 512,
     'yolov4-csp': 640,
@@ -19,7 +20,8 @@ DIRECTORY = 'weights/yolo'
 
 if __name__ == '__main__':
     for model in [
-        'yolov3-tiny', 'yolov3', 'yolov4-tiny', 'yolov4',
+        'yolov3-tiny', 'yolov3', 'yolov3-spp',
+        'yolov4-tiny', 'yolov4',
         # yolov4-csp', 'yolov4x-mish'
     ]:
         imgsize = IMAGE_SIZES[model]

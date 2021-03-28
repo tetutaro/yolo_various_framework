@@ -16,6 +16,8 @@ run YOLO (object detection model) on various platforms and compare them
         - input image size: 512x512
     - yolov3
         - input image size: 512x512
+    - yolov3-spp
+        - input image size: 512x512
 - [YOLO V4](https://github.com/AlexeyAB/darknet)
     - yolov4-tiny
         - input image size: 512x512
@@ -40,13 +42,13 @@ run YOLO (object detection model) on various platforms and compare them
 all deep learing platforms below were ran on Python 3.7.9
 
 - PyTorch
-    - torch 1.7.1
+    - torch 1.8.1
 - TensorFlow (Frozen Graph)
     - tensorflow 2.4.1
 - TensorFlow Lite
     - tflite-runtime 2.5.0
 - ONNX
-    - onnxruntime 1.6.0
+    - onnxruntime 1.7.0
 - OpenVINO
     - OpenVINO 2021.2.185
 
@@ -54,7 +56,7 @@ all deep learing platforms below were ran on Python 3.7.9
 
 - onnx 1.8.1
 - onnx-tf 1.7.0
-- tf2onnx 1.8.3
+- tf2onnx 1.8.4
 
 ## my environment
 
