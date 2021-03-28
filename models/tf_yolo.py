@@ -117,10 +117,14 @@ class DarknetConv(Layer):
 
 
 class UpSampling(Layer):
-    def __init__(self: UpSampling, fil: int) -> None:
+    def __init__(
+        self: UpSampling,
+        fil: int,
+        actfunc: str = 'leaky'
+    ) -> None:
         super().__init__()
         self.weighted_layers = list()
-        self.dc = DarknetConv(fil=fil, ksize=1)
+        self.dc = DarknetConv(fil=fil, ksize=1, actfunc=actfunc)
         self.weighted_layers.extend(self.dc.weighted_layers)
         return
 
@@ -139,7 +143,11 @@ class YoloLayer(Layer):
         super().__init__()
         self.weighted_layers = list()
         fil2 = 3 * (nc + 5)
-        self.dc1 = DarknetConv(fil=fil, ksize=3)
+        if act:
+            actfunc = 'mish'
+        else:
+            actfunc = 'leaky'
+        self.dc1 = DarknetConv(fil=fil, ksize=3, actfunc=actfunc)
         self.weighted_layers.extend(self.dc1.weighted_layers)
         self.dc2 = DarknetConv(
             fil=fil2, ksize=1, act=act, actfunc='sigmoid', bn=False
@@ -183,15 +191,17 @@ class DarknetBlock(Layer):
     def __init__(
         self: DarknetResidual,
         fils: Tuple[int, int],
-        blocks: int
+        blocks: int,
+        actfunc: str = 'leaky'
     ) -> None:
         super().__init__()
         self.weighted_layers = list()
         f1, f2 = fils
-        self.conv = DarknetConv(fil=f1, ksize=3, ds=True)
+        self.conv = DarknetConv(fil=f1, ksize=3, actfunc=actfunc, ds=True)
         self.weighted_layers.extend(self.conv.weighted_layers)
         self.blocks = tf.keras.Sequential([
-            DarknetResidual(fils=fils) for _ in range(blocks)
+            DarknetResidual(fils=fils, actfunc=actfunc)
+            for _ in range(blocks)
         ])
         for block in self.blocks.layers:
             self.weighted_layers.extend(block.weighted_layers)
@@ -224,15 +234,15 @@ class DarknetBlock_CSPnet_tiny(Layer):
         x: tf.Tensor
     ) -> Tuple[tf.Tensor]:
         x = self.dc1(x)
-        route_1 = x
+        route_2 = x
         x = tf.split(x, num_or_size_splits=2, axis=-1)[1]
         x = self.dc2(x)
-        route_2 = x
+        route_1 = x
         x = self.dc3(x)
-        x = tf.concat([x, route_2], axis=-1)
+        x = tf.concat([x, route_1], axis=-1)
         x = self.dc4(x)
         route_3 = x
-        x = tf.concat([route_1, x], axis=-1)
+        x = tf.concat([route_2, x], axis=-1)
         x = self.mp(x)
         return route_3, x
 
@@ -311,6 +321,46 @@ class SPP(Layer):
         return self.dc6(self.dc5(self.dc4(x)))
 
 
+class SPP_CSPnet(Layer):
+    '''SPP block with CSPnet
+    '''
+    def __init__(self: SPP_CSPnet, fil: int, blocks: int) -> None:
+        super().__init__()
+        self.weighted_layers = list()
+        self.dc1 = DarknetConv(fil=fil, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc1.weighted_layers)
+        self.dc2 = DarknetConv(fil=fil, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc2.weighted_layers)
+        self.dc3 = DarknetConv(fil=fil, ksize=3, actfunc='mish')
+        self.weighted_layers.extend(self.dc3.weighted_layers)
+        self.dc4 = DarknetConv(fil=fil, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc4.weighted_layers)
+        self.mp1 = MaxPool2D(pool_size=13, strides=1, padding='SAME')
+        self.mp2 = MaxPool2D(pool_size=9, strides=1, padding='SAME')
+        self.mp3 = MaxPool2D(pool_size=5, strides=1, padding='SAME')
+        dcs = list()
+        for _ in range(blocks):
+            dcs.append(DarknetConv(fil=fil, ksize=1, actfunc='mish'))
+            dcs.append(DarknetConv(fil=fil, ksize=3, actfunc='mish'))
+        self.dcs = tf.keras.Sequential(dcs)
+        for dc in self.dcs.layers:
+            self.weighted_layers.extend(dc.weighted_layers)
+        self.dc5 = DarknetConv(fil=fil, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc5.weighted_layers)
+        return
+
+    def call(self: SPP_CSPnet, x: tf.Tensor) -> tf.Tensor:
+        x = self.dc1(x)
+        route = x
+        x = self.dc4(self.dc3(self.dc2(x)))
+        x = self.dcs(tf.concat([
+            self.mp1(x), self.mp2(x), self.mp3(x), x
+        ], axis=-1))
+        x = tf.concat([x, route], axis=-1)
+        x = self.dc5(x)
+        return x
+
+
 class DarknetConvSeq(Layer):
     def __init__(self: DarknetConvSeq, fil: int) -> None:
         super().__init__()
@@ -328,6 +378,35 @@ class DarknetConvSeq(Layer):
 
     def call(self: DarknetConvSeq, x: tf.Tensor) -> tf.Tensor:
         return self.dcs(x)
+
+
+class DarknetConvSeq_CSPnet(Layer):
+    def __init__(self: DarknetConvSeq, fil: int, blocks: int) -> None:
+        super().__init__()
+        self.weighted_layers = list()
+        self.dc1 = DarknetConv(fil=fil, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc1.weighted_layers)
+        self.dc2 = DarknetConv(fil=fil, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc2.weighted_layers)
+        dcs = list()
+        for _ in range(blocks):
+            dcs.append(DarknetConv(fil=fil, ksize=1, actfunc='mish'))
+            dcs.append(DarknetConv(fil=fil, ksize=3, actfunc='mish'))
+        self.dcs = tf.keras.Sequential(dcs)
+        for dc in self.dcs.layers:
+            self.weighted_layers.extend(dc.weighted_layers)
+        self.dc3 = DarknetConv(fil=fil, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc3.weighted_layers)
+        return
+
+    def call(self: DarknetConvSeq, x: tf.Tensor) -> tf.Tensor:
+        x = self.dc1(x)
+        route = x
+        x = self.dc3(tf.concat([
+            self.dcs(x),
+            self.dc2(route)
+        ], axis=-1))
+        return x
 
 # ### BACKBONES ###
 
@@ -491,6 +570,61 @@ class Darknet53_CSPnet(Layer):
         x = self.spp(self.db5(x))
         return x_54, x_85, x
 
+
+class Darknet53_CSPnet_2(Layer):
+    '''backbone of YOLOv4-csp and YOLOv4x-mish
+    '''
+    def __init__(
+        self: Darknet53_CSPnet_2,
+        fil: int,
+        blocks: Tuple[int]
+    ) -> None:
+        super().__init__()
+        self.weighted_layers = list()
+        self.dc = DarknetConv(fil=32, ksize=3, actfunc='mish')
+        self.weighted_layers.extend(self.dc.weighted_layers)
+        fil1 = fil
+        fil2 = fil1 * 2
+        self.db1 = DarknetBlock(
+            fils=(fil2, fil1), blocks=blocks[0], actfunc='mish'
+        )
+        self.weighted_layers.extend(self.db1.weighted_layers)
+        fil1 *= 2
+        fil2 *= 2
+        self.db2 = DarknetBlock_CSPnet(
+            dcfils=(fil2, fil1), drfils=(fil1, fil1), blocks=blocks[1]
+        )
+        self.weighted_layers.extend(self.db2.weighted_layers)
+        fil1 *= 2
+        fil2 *= 2
+        self.db3 = DarknetBlock_CSPnet(
+            dcfils=(fil2, fil1), drfils=(fil1, fil1), blocks=blocks[2]
+        )
+        self.weighted_layers.extend(self.db3.weighted_layers)
+        fil1 *= 2
+        fil2 *= 2
+        self.db4 = DarknetBlock_CSPnet(
+            dcfils=(fil2, fil1), drfils=(fil1, fil1), blocks=blocks[3]
+        )
+        self.weighted_layers.extend(self.db4.weighted_layers)
+        fil1 *= 2
+        fil2 *= 2
+        self.db5 = DarknetBlock_CSPnet(
+            dcfils=(fil2, fil1), drfils=(fil1, fil1), blocks=blocks[4]
+        )
+        self.weighted_layers.extend(self.db5.weighted_layers)
+        self.spp = SPP_CSPnet(fil=fil1, blocks=blocks[5])
+        self.weighted_layers.extend(self.spp.weighted_layers)
+        return
+
+    def call(self: Darknet53_CSPnet, x: tf.Tensor) -> Tuple[tf.Tensor]:
+        x = self.db3(self.db2(self.db1(self.dc(x))))
+        route_1 = x
+        x = self.db4(x)
+        route_2 = x
+        x = self.spp(self.db5(x))
+        return route_1, route_2, x
+
 # ### YOLO MODELS ###
 
 
@@ -515,10 +649,11 @@ class tf_YoloV3_tiny(tf.keras.Model):
         x = self.dc(x)
         x_13 = x
         large_bbox = self.yl1(x)
-        middle_bbox = self.yl2(tf.concat([
+        x = tf.concat([
             self.us(x_13),
             x_8
-        ], axis=-1))
+        ], axis=-1)
+        middle_bbox = self.yl2(x)
         return middle_bbox, large_bbox
 
 
@@ -626,11 +761,11 @@ class tf_YoloV4_tiny(tf.keras.Model):
         return
 
     def call(self: tf_YoloV3, inputs: tf.Tensor) -> Tuple[tf.Tensor]:
-        route, x = self.net(inputs)
+        x_23, x = self.net(inputs)
         x = self.dc(x)
+        x_27 = x
         large_bbox = self.yl1(x)
-        x = self.us(x)
-        x = tf.concat([x, route], axis=-1)
+        x = tf.concat([self.us(x_27), x_23], axis=-1)
         middle_bbox = self.yl2(x)
         return middle_bbox, large_bbox
 
@@ -672,23 +807,27 @@ class tf_YoloV4(tf.keras.Model):
         return
 
     def call(self: tf_YoloV4, inputs: tf.Tensor) -> Tuple[tf.Tensor]:
-        x_54, x_85, x_116 = self.net(inputs)
-        x_126 = self.dcs1(tf.concat([
+        x_54, x_85, x = self.net(inputs)
+        x_116 = x
+        x = self.dcs1(tf.concat([
             self.dc1(x_85),
-            self.us1(x_116)
+            self.us1(x)
         ], axis=-1))
+        x_126 = x
         x = self.dcs2(tf.concat([
             self.dc2(x_54),
-            self.us2(x_126)
+            self.us2(x)
         ], axis=-1))
+        x_136 = x
         large_bbox = self.yl1(x)
         x = self.dcs3(tf.concat([
-            self.dc3(x),
+            self.dc3(x_136),
             x_126
         ], axis=-1))
+        x_148 = x
         middle_bbox = self.yl2(x)
         x = self.dcs4(tf.concat([
-            self.dc4(x),
+            self.dc4(x_148),
             x_116
         ], axis=-1))
         small_bbox = self.yl3(x)
@@ -698,7 +837,128 @@ class tf_YoloV4(tf.keras.Model):
 class tf_YoloV4_csp(tf.keras.Model):
     '''https://arxiv.org/abs/2011.08036
     '''
-    def __init__(self: tf_YoloV4, nc: int) -> None:
+    def __init__(self: tf_YoloV4_csp, nc: int) -> None:
         super().__init__()
         self.weighted_layers = list()
+        self.net = Darknet53_CSPnet_2(
+            fil=32, blocks=(1, 2, 8, 8, 4, 1)
+        )
+        self.weighted_layers.extend(self.net.weighted_layers)
+        self.us1 = UpSampling(fil=256, actfunc='mish')
+        self.weighted_layers.extend(self.us1.weighted_layers)
+        self.dc1 = DarknetConv(fil=256, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc1.weighted_layers)
+        self.dcs1 = DarknetConvSeq_CSPnet(fil=256, blocks=2)
+        self.weighted_layers.extend(self.dcs1.weighted_layers)
+        self.us2 = UpSampling(fil=128, actfunc='mish')
+        self.weighted_layers.extend(self.us2.weighted_layers)
+        self.dc2 = DarknetConv(fil=128, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc2.weighted_layers)
+        self.dcs2 = DarknetConvSeq_CSPnet(fil=128, blocks=2)
+        self.weighted_layers.extend(self.dcs2.weighted_layers)
+        self.yl1 = YoloLayer(fil=256, nc=nc, act=True)
+        self.weighted_layers.extend(self.yl1.weighted_layers)
+        self.dc3 = DarknetConv(fil=256, ksize=3, ds=True, actfunc='mish')
+        self.weighted_layers.extend(self.dc3.weighted_layers)
+        self.dcs3 = DarknetConvSeq_CSPnet(fil=256, blocks=2)
+        self.weighted_layers.extend(self.dcs3.weighted_layers)
+        self.yl2 = YoloLayer(fil=512, nc=nc, act=True)
+        self.weighted_layers.extend(self.yl2.weighted_layers)
+        self.dc4 = DarknetConv(fil=512, ksize=3, ds=True, actfunc='mish')
+        self.weighted_layers.extend(self.dc4.weighted_layers)
+        self.dcs4 = DarknetConvSeq_CSPnet(fil=512, blocks=2)
+        self.weighted_layers.extend(self.dcs4.weighted_layers)
+        self.yl3 = YoloLayer(fil=1024, nc=nc, act=True)
+        self.weighted_layers.extend(self.yl3.weighted_layers)
         return
+
+    def call(self: tf_YoloV4_csp, inputs: tf.Tensor) -> Tuple[tf.Tensor]:
+        x_48, x_79, x = self.net(inputs)
+        x_113 = x
+        x = self.dcs1(tf.concat([
+            self.dc1(x_79),
+            self.us1(x)
+        ], axis=-1))
+        x_127 = x
+        x = self.dcs2(tf.concat([
+            self.dc2(x_48),
+            self.us2(x)
+        ], axis=-1))
+        x_141 = x
+        large_bbox = self.yl1(x)
+        x = self.dcs3(tf.concat([
+            self.dc3(x_141),
+            x_127
+        ], axis=-1))
+        x_156 = x
+        middle_bbox = self.yl2(x)
+        x = self.dcs4(tf.concat([
+            self.dc4(x_156),
+            x_113
+        ], axis=-1))
+        small_bbox = self.yl3(x)
+        return small_bbox, middle_bbox, large_bbox
+
+
+class tf_YoloV4x_mish(tf.keras.Model):
+    def __init__(self: tf_YoloV4x_mish, nc: int) -> None:
+        super().__init__()
+        self.weighted_layers = list()
+        self.net = Darknet53_CSPnet_2(
+            fil=40, blocks=(1, 3, 10, 10, 5, 2)
+        )
+        self.weighted_layers.extend(self.net.weighted_layers)
+        self.us1 = UpSampling(fil=320, actfunc='mish')
+        self.weighted_layers.extend(self.us1.weighted_layers)
+        self.dc1 = DarknetConv(fil=320, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc1.weighted_layers)
+        self.dcs1 = DarknetConvSeq_CSPnet(fil=320, blocks=3)
+        self.weighted_layers.extend(self.dcs1.weighted_layers)
+        self.us2 = UpSampling(fil=160, actfunc='mish')
+        self.weighted_layers.extend(self.us2.weighted_layers)
+        self.dc2 = DarknetConv(fil=160, ksize=1, actfunc='mish')
+        self.weighted_layers.extend(self.dc2.weighted_layers)
+        self.dcs2 = DarknetConvSeq_CSPnet(fil=160, blocks=3)
+        self.weighted_layers.extend(self.dcs2.weighted_layers)
+        self.yl1 = YoloLayer(fil=320, nc=nc, act=True)
+        self.weighted_layers.extend(self.yl1.weighted_layers)
+        self.dc3 = DarknetConv(fil=320, ksize=3, ds=True, actfunc='mish')
+        self.weighted_layers.extend(self.dc3.weighted_layers)
+        self.dcs3 = DarknetConvSeq_CSPnet(fil=320, blocks=3)
+        self.weighted_layers.extend(self.dcs3.weighted_layers)
+        self.yl2 = YoloLayer(fil=640, nc=nc, act=True)
+        self.weighted_layers.extend(self.yl2.weighted_layers)
+        self.dc4 = DarknetConv(fil=640, ksize=3, ds=True, actfunc='mish')
+        self.weighted_layers.extend(self.dc4.weighted_layers)
+        self.dcs4 = DarknetConvSeq_CSPnet(fil=640, blocks=3)
+        self.weighted_layers.extend(self.dcs4.weighted_layers)
+        self.yl3 = YoloLayer(fil=1280, nc=nc, act=True)
+        self.weighted_layers.extend(self.yl3.weighted_layers)
+        return
+
+    def call(self: tf_YoloV4x_mish, inputs: tf.Tensor) -> Tuple[tf.Tensor]:
+        x_57, x_94, x = self.net(inputs)
+        x_133 = x
+        x = self.dcs1(tf.concat([
+            self.dc1(x_94),
+            self.us1(x)
+        ], axis=-1))
+        x_149 = x
+        x = self.dcs2(tf.concat([
+            self.dc2(x_57),
+            self.us2(x)
+        ], axis=-1))
+        x_165 = x
+        large_bbox = self.yl1(x)
+        x = self.dcs3(tf.concat([
+            self.dc3(x_165),
+            x_149
+        ], axis=-1))
+        x_182 = x
+        middle_bbox = self.yl2(x)
+        x = self.dcs4(tf.concat([
+            self.dc4(x_182),
+            x_133
+        ], axis=-1))
+        small_bbox = self.yl3(x)
+        return small_bbox, middle_bbox, large_bbox

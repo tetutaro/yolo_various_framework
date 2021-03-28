@@ -11,6 +11,8 @@ from models.tf_yolo import (
     tf_YoloV3_spp,
     tf_YoloV4_tiny,
     tf_YoloV4,
+    tf_YoloV4_csp,
+    tf_YoloV4x_mish,
 )
 from utils.convert_tflite import (
     save_frozen_graph,
@@ -26,6 +28,8 @@ MODEL_CLASS = {
     'yolov3-spp': tf_YoloV3_spp,
     'yolov4-tiny': tf_YoloV4_tiny,
     'yolov4': tf_YoloV4,
+    'yolov4-csp': tf_YoloV4_csp,
+    'yolov4x-mish': tf_YoloV4x_mish,
 }
 MODEL_SHAPE = {
     'yolov3-tiny': {
@@ -47,6 +51,14 @@ MODEL_SHAPE = {
     'yolov4': {
         'nlayers': 110,
         'nobn_layers': [93, 101, 109],
+    },
+    'yolov4-csp': {
+        'nlayers': 115,
+        'nobn_layers': [94, 104, 114],
+    },
+    'yolov4x-mish': {
+        'nlayers': 137,
+        'nobn_layers': [112, 124, 136],
     },
 }
 DEBUG = True
@@ -104,7 +116,10 @@ def _load_darknet_weights(
         else:
             assert norm_layer.__class__.__name__ == 'function'
             conv_layer.set_weights([conv_weights, conv_bias])
-    assert len(rf.read()) == 0, 'failed to read all data'
+    rest = len(rf.read())
+    # assert rest == 0, f'failed to read all data: {rest}'
+    if rest != 0:
+        print(f'failed to read all data: {rest}')
     rf.close()
     return
 
