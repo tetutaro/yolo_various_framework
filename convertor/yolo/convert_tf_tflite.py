@@ -61,7 +61,7 @@ MODEL_SHAPE = {
         'nobn_layers': [112, 124, 136],
     },
 }
-DEBUG = True
+DEBUG = False
 
 
 def _load_darknet_weights(
@@ -75,7 +75,6 @@ def _load_darknet_weights(
     )
     nlayers = MODEL_SHAPE[model]['nlayers']
     nobn_layers = MODEL_SHAPE[model]['nobn_layers']
-    j = 0
     if DEBUG:
         print(model)
         for i, layers in enumerate(model_keras.weighted_layers):
@@ -95,7 +94,6 @@ def _load_darknet_weights(
             )
             # tf weights: [gamma, beta, mean, variance]
             bn_weights = bn_weights.reshape((4, filters))[[1, 0, 2, 3]]
-            j += 1
         else:
             conv_bias = np.fromfile(
                 rf, dtype=np.float32, count=filters

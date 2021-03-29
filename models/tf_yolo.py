@@ -350,8 +350,8 @@ class SPP_CSPnet(Layer):
         return
 
     def call(self: SPP_CSPnet, x: tf.Tensor) -> tf.Tensor:
-        x = self.dc1(x)
         route = x
+        route = self.dc1(route)
         x = self.dc4(self.dc3(self.dc2(x)))
         x = self.dcs(tf.concat([
             self.mp1(x), self.mp2(x), self.mp3(x), x
