@@ -280,12 +280,13 @@ class DarknetBlock_CSPnet(Layer):
         return
 
     def call(self: DarknetBlock_CSPnet, x: tf.Tensor) -> tf.Tensor:
-        route_1 = self.dc1(x)
-        route_2 = route_1
-        route_2 = self.dc2(route_2)
-        route_1 = self.dc4(self.drs(self.dc3(route_1)))
-        x = tf.concat([route_1, route_2], axis=-1)
-        return self.dc5(x)
+        x = self.dc1(x)
+        route = x
+        x = self.dc5(tf.concat([
+            self.dc4(self.drs(self.dc3(x))),
+            self.dc2(route)
+        ], axis=-1))
+        return x
 
 
 class SPP(Layer):
@@ -351,13 +352,14 @@ class SPP_CSPnet(Layer):
 
     def call(self: SPP_CSPnet, x: tf.Tensor) -> tf.Tensor:
         route = x
-        route = self.dc1(route)
         x = self.dc4(self.dc3(self.dc2(x)))
         x = self.dcs(tf.concat([
             self.mp1(x), self.mp2(x), self.mp3(x), x
         ], axis=-1))
-        x = tf.concat([x, route], axis=-1)
-        x = self.dc5(x)
+        x = self.dc5(tf.concat([
+            x,
+            self.dc1(route)
+        ], axis=-1))
         return x
 
 

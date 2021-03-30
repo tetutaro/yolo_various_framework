@@ -23,10 +23,11 @@ run YOLO (object detection model) on various platforms and compare them
         - input image size: 512x512
     - yolov4
         - input image size: 512x512
-    - yolov4-csp (Scaled-YOLOv4)
+    - [IN-PROGRESS] yolov4-csp ([Scaled-YOLOv4](https://github.com/WongKinYiu/ScaledYOLOv4/tree/yolov4-csp))
         - input image size: 640x640
-    - yolov4x-mish
+    - [IN-PROGRESS] yolov4x-mish ([YOLOv4-large P5](https://github.com/WongKinYiu/ScaledYOLOv4/tree/yolov4-large))
         - input image size: 640x640
+- [IN-PROGRESS] YOLO V3 & V4 are able to run only on TensorFlow, TensorFlow Lite and ONNX (converted from TensorFlow)
 - [YOLO V5](https://github.com/ultralytics/yolov5)
     - yolov5s
         - input image size: 640x640

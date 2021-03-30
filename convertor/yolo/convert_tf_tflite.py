@@ -3,6 +3,7 @@
 from typing import List
 import tensorflow as tf
 import os
+import math
 import numpy as np
 # YOLO V3, V4
 from models.tf_yolo import (
@@ -61,6 +62,7 @@ MODEL_SHAPE = {
         'nobn_layers': [112, 124, 136],
     },
 }
+STRIDES = [8, 16, 32, 64, 128]
 DEBUG = False
 
 
@@ -98,6 +100,14 @@ def _load_darknet_weights(
             conv_bias = np.fromfile(
                 rf, dtype=np.float32, count=filters
             )
+            if model in ['yolov4-csp', 'yolov4x-mish']:
+                # https://arxiv.org/abs/1708.02002
+                offset = np.where(np.array(nobn_layers) == i)[0][0]
+                stride = STRIDES[offset]
+                conv_bias = conv_bias.reshape(3, 85)
+                conv_bias[:, 4] += math.log(8 / (640 / stride) ** 2)
+                conv_bias[:, 5:] += math.log(0.6 / (80 - 0.99))
+                conv_bias = conv_bias.reshape(-1)
         # darknet shape (out_dim, in_dim, height, width)
         conv_shape = (filters, in_dim, k_size, k_size)
         conv_weights = np.fromfile(
@@ -115,9 +125,7 @@ def _load_darknet_weights(
             assert norm_layer.__class__.__name__ == 'function'
             conv_layer.set_weights([conv_weights, conv_bias])
     rest = len(rf.read())
-    # assert rest == 0, f'failed to read all data: {rest}'
-    if rest != 0:
-        print(f'failed to read all data: {rest}')
+    assert rest == 0, f'failed to read all data: {rest}'
     rf.close()
     return
 

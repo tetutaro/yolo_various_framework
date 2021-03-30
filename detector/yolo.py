@@ -68,6 +68,12 @@ STRIDE_XYSCALES = {
 path_wt = 'weights/yolo'
 
 
+def sigmoid(x: np.ndarray) -> np.ndarray:
+    sigmoid_range = 34.538776394910684
+    x = np.clip(x, -sigmoid_range, sigmoid_range)
+    return 1.0 / (1.0 + np.exp(-x))
+
+
 class YoloTFOnnx(Framework):
     def __init__(self: YoloTFOnnx, config: Config) -> None:
         super().__init__(config=config)
@@ -305,10 +311,53 @@ class Yolo(Model):
         return
 
     @staticmethod
-    def sigmoid(x: np.ndarray) -> np.ndarray:
-        sigmoid_range = 34.538776394910684
-        x = np.clip(x, -sigmoid_range, sigmoid_range)
-        return 1.0 / (1.0 + np.exp(-x))
+    def apply_anchors_ver1(
+        pred: np.ndarray,
+        anchor_grid: np.ndarray,
+        stride: int,
+        anchor: List[int],
+        xyscale: float
+    ) -> np.ndarray:
+        # xy: min_x, min_y
+        # wh: width, height
+        # conf: confidence score of the bounding box
+        # prob: probability for each category
+        xy, wh, conf, prob = np.split(
+            pred, (2, 4, 5), axis=-1
+        )
+        # apply anchor to xy
+        xy = ((
+            (sigmoid(xy) * xyscale) - (0.5 * (xyscale - 1))
+        ) + anchor_grid) * np.array([stride, stride])
+        # apply anchor to wh
+        wh = np.exp(wh) * np.array(anchor)
+        # do sigmoid to probability
+        conf = sigmoid(conf)
+        prob = sigmoid(prob)
+        # concat
+        bbox = np.concatenate([xy, wh, conf, prob], axis=-1)
+        # expand all anchors
+        bbox = np.reshape(bbox, (-1, 85))
+        return bbox
+
+    @staticmethod
+    def apply_anchors_ver2(
+        pred: np.ndarray,
+        anchor_grid: np.ndarray,
+        stride: int,
+        anchor: List[int],
+        xyscale: float
+    ) -> np.ndarray:
+        anchor = (np.array(anchor) / stride)[np.newaxis, np.newaxis, :, :]
+        pred = sigmoid(pred)
+        # apply anchor to xy
+        pred[..., :2] = pred[..., :2] * xyscale - 0.5 + anchor_grid
+        # apply anchor to wh
+        pred[..., 2:4] = (pred[..., 2:4] * xyscale) ** 2 * anchor
+        pred[..., :4] *= stride
+        # expand all anchors
+        bbox = np.reshape(pred, (-1, 85))
+        return bbox
 
     def apply_anchors(self: Yolo, preds: List[np.ndarray]) -> np.ndarray:
         image_size = IMAGE_SIZES[self.config.model]
@@ -316,45 +365,34 @@ class Yolo(Model):
         xyscales = STRIDE_XYSCALES[self.config.model]
         applied = list()
         for i, pred in enumerate(preds):
-            anchor_size = pred.shape[0]
-            stride = image_size // anchor_size
-            strides = [stride, stride]
+            stride = image_size // max(pred.shape[:2])
             anchor = anchors[stride]
             xyscale = xyscales[stride]
-            pred = np.reshape(pred, (anchor_size, anchor_size, 3, 85))
-            # xy: min_x, min_y
-            # wh: width, height
-            # conf: confidence score of the bounding box
-            # prob: probability for each category
-            xy, wh, conf, prob = np.split(
-                pred, (2, 4, 5), axis=-1
+            pred = np.reshape(pred, (*pred.shape[:2], 3, 85))
+            # calc grid of anchor box
+            anchor_grid = np.meshgrid(
+                np.arange(pred.shape[1]), np.arange(pred.shape[0])
             )
-            # calc offset of each anchor box
-            anchor_offset = np.meshgrid(
-                np.arange(anchor_size), np.arange(anchor_size)
-            )
-            anchor_offset = np.expand_dims(
-                np.stack(anchor_offset, axis=-1), axis=2
-            )
-            anchor_offset = np.tile(
-                anchor_offset, [1, 1, 3, 1]
-            ).astype(np.float)
-            # apply anchor to xy
-            xy = (
-                (
-                    (self.sigmoid(xy) * xyscale) - (0.5 * (xyscale - 1))
-                ) + anchor_offset
-            ) * strides
-            # apply anchor to wh
-            wh = np.exp(wh) * anchor
-            # do sigmoid to probability
-            conf = self.sigmoid(conf)
-            prob = self.sigmoid(prob)
-            # concat
-            bbox = np.concatenate([xy, wh, conf, prob], axis=-1)
-            # expand all anchors
-            bbox = np.reshape(bbox, (-1, 85))
-            # done
+            anchor_grid = np.stack(
+                anchor_grid, axis=-1
+            )[:, :, np.newaxis, :]
+            # call each version of apply_anchors
+            if self.config.model in ['yolov4-csp', 'yolov4x-mish']:
+                bbox = self.apply_anchors_ver2(
+                    pred=pred,
+                    anchor_grid=anchor_grid,
+                    stride=stride,
+                    anchor=anchor,
+                    xyscale=xyscale
+                )
+            else:
+                bbox = self.apply_anchors_ver1(
+                    pred=pred,
+                    anchor_grid=anchor_grid,
+                    stride=stride,
+                    anchor=anchor,
+                    xyscale=xyscale
+                )
             applied.append(bbox)
         return np.concatenate(applied, axis=0)
 
