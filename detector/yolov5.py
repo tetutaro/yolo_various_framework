@@ -189,15 +189,13 @@ class YoloV5Onnx(Framework):
 class YoloV5Torch(Framework):
     def __init__(self: YoloV5Torch, config: Config) -> None:
         super().__init__(config=config)
-        path_weight = f'{path_wt}/{config.model}.pt'
-        if not os.path.isfile(path_weight):
-            raise SystemError(f'weight({path_weight}) not found')
+        path_torch = f'{path_wt}/{config.model}.pth'
+        if not os.path.isfile(path_torch):
+            raise SystemError(f'weight({path_torch}) not found')
         repo = 'ultralytics/yolov5'
         model = torch.hub.load(repo, config.model, pretrained=False)
-        ckpt = torch.load(path_weight, map_location='cpu')['model']
-        model.load_state_dict(ckpt.state_dict())
-        model.names = ckpt.names
-        self.model = model.float().fuse()
+        model.load_state_dict(torch.load(path_torch, map_location='cpu'))
+        self.model = model.fuse()
         self.model.eval()
         self.input_name = 'images'
         return

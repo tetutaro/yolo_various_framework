@@ -25,7 +25,7 @@ class Hardswish(nn.Module):
         return x * F.hardtanh(x + 3, 0., 6.) / 6.
 
 
-def yolov5_convert_onnx(
+def yolov5_convert_torch_onnx(
     model: str,
     directory: str,
     imgsize: List[int],
@@ -34,9 +34,8 @@ def yolov5_convert_onnx(
     path_weight = f'{directory}/{model}.pt'
     if not os.path.isfile(path_weight):
         return
+    path_torch = f'{directory}/{model}.pth'
     path_onnx = f'{directory}/{model}.onnx'
-    if os.path.isfile(path_onnx):
-        return
     dummy_image = torch.zeros(1, 3, *imgsize)
     model_torch = torch.hub.load(repo, model)
     ckpt = torch.load(
@@ -46,6 +45,11 @@ def yolov5_convert_onnx(
     model_torch.names = ckpt.names
     model_torch = model_torch.float()  # fuse()
     model_torch.eval()
+    # save state dict
+    if not os.path.isfile(path_torch):
+        torch.save(model_torch.state_dict(), path_torch)
+    if os.path.isfile(path_onnx):
+        return
     for k, m in model_torch.named_modules():
         m._non_persistent_buffers_set = set()
         if type(m) in [
