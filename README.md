@@ -131,3 +131,30 @@ frameworks:
   tflite                TensorFlow Lite
   tf_onnx               ONNX onverted from TensorFlow
 ```
+
+## results
+
+NOTE: following data was measured at certain conditions. Just FYI.
+
+- images: randomly selected 100 images from COCO val2017 dataset
+- Elapsed time includes...
+    - image preprocessing
+        - adjusting white balance
+        - smoothing image with Gaussian Blur
+        - correcting contract (brighten dark areas)
+        - clarify image using Super-Resolution
+    - inference
+    - filtering bounding boxes
+        - apply anchors
+        - calc confidence score
+        - NMS
+            - eliminate small and unconfident bounding box which is inside of big and confident bounding box
+- confidence score threshold: 0.3
+- IoU threshold: 0.45
+- tool for calculating mAP: [`object_detection_metrics`](https://github.com/tetutaro/object_detection_metrics) (may be WRONG!!)
+
+![](/yolo_various_framework/ipynb/time.png)
+
+![](/yolo_various_framework/ipynb/map.png)
+
+![](/yolo_various_framework/ipynb/time_vs_map.png)
