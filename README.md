@@ -71,9 +71,9 @@ all deep learing frameworks below were ran on Python 3.7.9
     - `./download_font.sh`
     - `./download_superres.sh`
 - download COCO dataset and create small dataset (convert annotations)
-    - see datasets/README
+    - see [datasets/README](https://github.com/tetutaro/yolo_various_framework/tree/main/datasets)
 - download pre-trained weights
-    - see weights/README
+    - see [weights/README](https://github.com/tetutaro/yolo_various_framework/tree/main/weights)
 - convert pre-trained weights to various frameworks
     - `./convert_yolo.py`
     - `./convert_yolov5.py`
