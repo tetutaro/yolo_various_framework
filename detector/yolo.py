@@ -364,7 +364,7 @@ class Yolo(Model):
         anchors = STRIDE_ANCHORS[self.config.model]
         xyscales = STRIDE_XYSCALES[self.config.model]
         applied = list()
-        for i, pred in enumerate(preds):
+        for pred in preds:
             stride = image_size // max(pred.shape[:2])
             anchor = anchors[stride]
             xyscale = xyscales[stride]

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 from __future__ import annotations
+from typing import List
 from detector.base import Session, Config, Framework, Model, Detector
 import os
 import numpy as np
@@ -13,6 +14,34 @@ from utils.convert_tflite import load_frozen_graph
 
 IMAGE_SIZE = 640
 path_wt = 'weights/yolov5'
+ANCHORS = {
+  8: [(10, 13), (16, 30), (33, 23)],        # P3/8
+  16: [(30, 61), (62, 45), (59, 119)],      # P4/16
+  32: [(116, 90), (156, 198), (373, 326)],  # P5/32
+}
+
+
+def sigmoid(x: np.ndarray) -> np.ndarray:
+    sigmoid_range = 34.538776394910684
+    x = np.clip(x, -sigmoid_range, sigmoid_range)
+    return 1.0 / (1.0 + np.exp(-x))
+
+
+def apply_anchors(preds: List[np.ndarray]) -> np.ndarray:
+    applied = list()
+    for pred in preds:
+        stride = IMAGE_SIZE // max(pred.shape[1:3])
+        anchor = np.array(ANCHORS[stride])
+        anchor_grid = np.reshape(anchor, (3, 1, 1, 2))
+        grid = np.meshgrid(
+            np.arange(pred.shape[2]), np.arange(pred.shape[1])
+        )
+        grid = np.stack(grid, axis=-1)[np.newaxis, :, :, :]
+        pred = sigmoid(pred)
+        pred[..., :2] = ((pred[..., :2] * 2) - 0.5 + grid) * stride
+        pred[..., 2:4] = ((pred[..., 2:4] * 2) ** 2) * anchor_grid
+        applied.append(np.reshape(pred, (-1, 85)))
+    return np.concatenate(applied, axis=0)
 
 
 class YoloV5TFOnnx(Framework):
@@ -128,8 +157,9 @@ class YoloV5OnnxTF(Framework):
         return
 
     def inference(self: YoloV5OnnxTF, sess: Session) -> np.ndarray:
-        pred = self.model(sess.yolov5_input[self.input_name])
-        return np.squeeze(pred[0].numpy(), 0).copy()
+        preds = self.model(sess.yolov5_input[self.input_name])
+        preds = [np.squeeze(x.numpy(), 0).copy() for x in preds]
+        return apply_anchors(preds=preds)
 
 
 class YoloV5Vino(Framework):
@@ -148,16 +178,16 @@ class YoloV5Vino(Framework):
         input_shape = net.input_info[self.input_name].input_data.shape
         assert input_shape[2] == IMAGE_SIZE
         assert input_shape[3] == IMAGE_SIZE
-        output_blob = list(net.outputs.keys())
-        assert 'output' in output_blob
-        self.output_blob = ['output']
+        self.output_blob = list(net.outputs.keys())
         self.exec_net = ie.load_network(network=net, device_name='CPU')
         return
 
     def inference(self: YoloV5Vino, sess: Session) -> np.ndarray:
-        pred = self.exec_net.infer(inputs=sess.yolov5_input)
-        pred = [pred[ob] for ob in self.output_blob]
-        return np.squeeze(pred[0], 0).copy()
+        preds = self.exec_net.infer(inputs=sess.yolov5_input)
+        preds = [
+            np.squeeze(preds[ob], 0).copy() for ob in self.output_blob
+        ]
+        return apply_anchors(preds=preds)
 
 
 class YoloV5Onnx(Framework):
@@ -173,17 +203,16 @@ class YoloV5Onnx(Framework):
         input_shape = self.sess.get_inputs()[0].shape
         assert input_shape[2] == IMAGE_SIZE
         assert input_shape[3] == IMAGE_SIZE
-        output_blob = [x.name for x in self.sess.get_outputs()]
-        assert 'output' in output_blob
-        self.output_blob = ['output']
+        self.output_blob = [x.name for x in self.sess.get_outputs()]
         return
 
     def inference(self: YoloV5Onnx, sess: Session) -> np.ndarray:
-        pred = self.sess.run(
+        preds = self.sess.run(
             output_names=self.output_blob,
             input_feed=sess.yolov5_input
         )
-        return np.squeeze(pred[0], 0).copy()
+        preds = [np.squeeze(x, 0).copy() for x in preds]
+        return apply_anchors(preds=preds)
 
 
 class YoloV5Torch(Framework):
@@ -192,7 +221,7 @@ class YoloV5Torch(Framework):
         path_torch = f'{path_wt}/{config.model}.pth'
         if not os.path.isfile(path_torch):
             raise SystemError(f'weight({path_torch}) not found')
-        repo = 'ultralytics/yolov5'
+        repo = 'ultralytics/yolov5:v4.0'
         model = torch.hub.load(repo, config.model, pretrained=False)
         model.load_state_dict(torch.load(path_torch, map_location='cpu'))
         self.model = model.fuse()
@@ -205,7 +234,7 @@ class YoloV5Torch(Framework):
             sess.yolov5_input[self.input_name]
         ).to('cpu')
         with torch.no_grad():
-            pred = self.model(input_feed, augment=True)[0]
+            pred = self.model(input_feed)[0]
         return np.squeeze(pred.detach().numpy(), 0).copy()
 
 

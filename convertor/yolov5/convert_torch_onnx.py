@@ -29,7 +29,7 @@ def yolov5_convert_torch_onnx(
     model: str,
     directory: str,
     imgsize: List[int],
-    repo: str = 'ultralytics/yolov5'
+    repo: str = 'ultralytics/yolov5:v4.0'
 ) -> None:
     path_weight = f'{directory}/{model}.pt'
     if not os.path.isfile(path_weight):
@@ -43,35 +43,30 @@ def yolov5_convert_torch_onnx(
     )['model']
     model_torch.load_state_dict(ckpt.state_dict())
     model_torch.names = ckpt.names
-    model_torch = model_torch.float()  # fuse()
-    model_torch.eval()
     # save state dict
     if not os.path.isfile(path_torch):
         torch.save(model_torch.state_dict(), path_torch)
     if os.path.isfile(path_onnx):
         return
-    for k, m in model_torch.named_modules():
+    model_torch_onnx = model_torch.fuse()
+    model_torch_onnx.eval()
+    for k, m in model_torch_onnx.named_modules():
         m._non_persistent_buffers_set = set()
-        if type(m) in [
-            nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU
-        ]:
-            m.inplace = True
         if m.__class__.__name__ == 'Conv':
             if isinstance(m.act, nn.Hardswish):
                 m.act = Hardswish()
             elif isinstance(m.act, nn.SiLU):
                 m.act = SiLU()
-    model_torch.model[-1].export = False
-    _ = model_torch(dummy_image)
-    output_names = ['output']
+    model_torch_onnx.model[-1].export = True
+    _ = model_torch_onnx(dummy_image)
     print('Starting ONNX export with onnx %s...' % onnx.__version__)
     try:
         torch.onnx.export(
-            model_torch, dummy_image, path_onnx,
+            model_torch_onnx, dummy_image, path_onnx,
             verbose=False,
             opset_version=12,
             input_names=['images'],
-            output_names=output_names
+            output_names=['output', 'output_1', 'output_2']
         )
         model_onnx = onnx.load(path_onnx)
         onnx.checker.check_model(model_onnx)

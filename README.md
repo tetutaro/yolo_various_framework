@@ -78,7 +78,7 @@ all deep learing frameworks below were ran on Python 3.7.9
     - `./convert_yolo.py`
     - `./convert_yolov5.py`
 - (if you want to calc metrics) please install [`object_detection_metrics`](https://github.com/tetutaro/object_detection_metrics)
-    - `> pip install "git+https://github.com/tetutaro/object_detection_metrics.git`
+    - `> pip install "git+https://github.com/tetutaro/object_detection_metrics.git"`
 
 ## usage
 
