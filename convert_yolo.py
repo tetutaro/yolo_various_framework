@@ -21,7 +21,8 @@ DIRECTORY = 'weights/yolo'
 if __name__ == '__main__':
     for model in [
         'yolov3-tiny', 'yolov3', 'yolov3-spp',
-        'yolov4-tiny', 'yolov4', 'yolov4-csp', 'yolov4x-mish',
+        'yolov4-tiny', 'yolov4',
+        # 'yolov4-csp', 'yolov4x-mish',
     ]:
         imgsize = IMAGE_SIZES[model]
         # yolo_convert_torch_onnx(

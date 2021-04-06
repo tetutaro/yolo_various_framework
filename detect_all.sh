@@ -11,7 +11,7 @@ fi
 datanames=(${dir//\// })
 dataname=${datanames[${#datanames[@]}-1]}
 models=(
-    "yolov3-tiny" "yolov3" "yolov3-spp" "yolov4-tiny" "yolov4" "yolov4-csp" "yolov4x-mish"
+    "yolov3-tiny" "yolov3" "yolov3-spp" "yolov4-tiny" "yolov4"
 )
 frames=(
     "tf" "tf_onnx"

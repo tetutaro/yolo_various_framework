@@ -1,13 +1,13 @@
-# yolo_various_platforms
+# yolo_various_framework
 
-run YOLO (object detection model) on various platforms and compare them
+run YOLO (object detection model) on various frameworks and compare them
 
 ## my motivations
 
 - I want to run object detection models on my PC
     - I don't have so much money to buy any GPU
-- I want to know which platform is the best in the meaning of elapsed time
-- I want to confirm that the predicted results are not so much different when I convert pre-trained weights to another platform
+- I want to know which framework is the best in the meaning of elapsed time
+- I want to confirm that the predicted results are not so much different when I convert pre-trained weights to another framework
 
 ## object deteciton models
 
@@ -27,7 +27,7 @@ run YOLO (object detection model) on various platforms and compare them
         - input image size: 640x640
     - [IN-PROGRESS] yolov4x-mish ([YOLOv4-large P5](https://github.com/WongKinYiu/ScaledYOLOv4/tree/yolov4-large))
         - input image size: 640x640
-- [IN-PROGRESS] YOLO V3 & V4 are able to run only on TensorFlow, TensorFlow Lite and ONNX (converted from TensorFlow)
+- [IN-PROGRESS] YOLO V3 & V4 are able to run only on `tf`, `tflite` and `tf_onnx`
 - [YOLO V5](https://github.com/ultralytics/yolov5)
     - yolov5s
         - input image size: 640x640
@@ -38,15 +38,15 @@ run YOLO (object detection model) on various platforms and compare them
     - yolov5x
         - input image size: 640x640
 
-## deep learning platforms
+## deep learning frameworks
 
-all deep learing platforms below were ran on Python 3.7.9
+all deep learing frameworks below were ran on Python 3.7.9
 
-- PyTorch
+- PyTorch (State Dict)
     - torch 1.8.1
 - TensorFlow (Frozen Graph)
     - tensorflow 2.4.1
-- TensorFlow Lite
+- TensorFlow Lite (Flat Buffer)
     - tflite-runtime 2.5.0
 - ONNX
     - onnxruntime 1.7.0
@@ -74,7 +74,7 @@ all deep learing platforms below were ran on Python 3.7.9
     - see datasets/README
 - download pre-trained weights
     - see weights/README
-- convert pre-trained weights to various platforms
+- convert pre-trained weights to various frameworks
     - `./convert_yolo.py`
     - `./convert_yolov5.py`
 - (if you want to calc metrics) please install [`object_detection_metrics`](https://github.com/tetutaro/object_detection_metrics)
@@ -84,7 +84,7 @@ all deep learing platforms below were ran on Python 3.7.9
 
 ```
 usage: detect.py [-h]
-    -m {yolov3-tiny,yolov3,yolov4-tiny,yolov4,yolov4-csp,yolov4x-mish,yolov5s,yolov5m,yolov5l,yolov5x}
+    -m {yolov3-tiny,yolov3,yolov4-tiny,yolov4,yolov5s,yolov5m,yolov5l,yolov5x}
     -f {torch,torch_onnx,onnx_vino,onnx_tf,tf,tflite,tf_onnx}
     [-q {fp32,fp16,int8}]
     -d IMAGE_DIR
@@ -121,4 +121,13 @@ optional arguments:
   --disable-soft-nms    use hard-NMS instead of soft-NMS
   --disable-iou-subset  do not eliminate small and unconfident bounding box
                         which is inside of big and confident bounding box
+
+frameworks:
+  torch                 PyTorch
+  torch_onnx            ONNX converted from PyTorch
+  onnx_vino             OpenVINO converted from torch_onnx
+  onnx_tf               TensorFlow(SavedModel) converted from torch_onnx
+  tf                    TensorFlow(FrozenGraph)
+  tflite                TensorFlow Lite
+  tf_onnx               ONNX onverted from TensorFlow
 ```
