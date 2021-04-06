@@ -153,8 +153,8 @@ NOTE: following data was measured at certain conditions. Just FYI.
 - IoU threshold: 0.45
 - tool for calculating mAP: [`object_detection_metrics`](https://github.com/tetutaro/object_detection_metrics) (may be WRONG!!)
 
-![](/yolo_various_framework/ipynb/time.png)
+![](ipynb/time.png)
 
-![](/yolo_various_framework/ipynb/map.png)
+![](ipynb/map.png)
 
-![](/yolo_various_framework/ipynb/time_vs_map.png)
+![](ipynb/time_vs_map.png)
