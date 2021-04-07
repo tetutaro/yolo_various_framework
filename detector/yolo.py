@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 from __future__ import annotations
-from typing import List
+from typing import List, Tuple
 from detector.base import Session, Config, Framework, Model, Detector
 import os
 import numpy as np
@@ -18,8 +18,8 @@ IMAGE_SIZES = {
     'yolov3-spp': 512,
     'yolov4-tiny': 512,
     'yolov4': 512,
-    'yolov4-csp': 640,
-    'yolov4x-mish': 640,
+    'yolov4-csp': 512,
+    'yolov4x-mish': 512,
 }
 STRIDE_ANCHORS = {
     'yolov3-tiny': {
@@ -313,11 +313,20 @@ class Yolo(Model):
     @staticmethod
     def apply_anchors_ver1(
         pred: np.ndarray,
-        anchor_grid: np.ndarray,
         stride: int,
-        anchor: List[int],
+        anchor: List[Tuple[int]],
         xyscale: float
     ) -> np.ndarray:
+        assert len(pred.shape) == 3
+        assert pred.shape[2] == 255
+        # align the axes to (x, y, anchor, data)
+        pred = pred.reshape((*pred.shape[:2], 3, 85))
+        # calc grid of anchor box
+        anchor_grid = np.array(anchor)[np.newaxis, np.newaxis, :, :]
+        grid = np.meshgrid(
+            np.arange(pred.shape[1]), np.arange(pred.shape[0])
+        )
+        grid = np.stack(grid, axis=-1)[:, :, np.newaxis, :]
         # xy: min_x, min_y
         # wh: width, height
         # conf: confidence score of the bounding box
@@ -325,13 +334,11 @@ class Yolo(Model):
         xy, wh, conf, prob = np.split(
             pred, (2, 4, 5), axis=-1
         )
-        # apply anchor to xy
-        xy = ((
-            (sigmoid(xy) * xyscale) - (0.5 * (xyscale - 1))
-        ) + anchor_grid) * np.array([stride, stride])
-        # apply anchor to wh
-        wh = np.exp(wh) * np.array(anchor)
-        # do sigmoid to probability
+        # apply anchor
+        xy = (
+            (sigmoid(xy) * xyscale) - (0.5 * (xyscale - 1)) + grid
+        ) * stride
+        wh = np.exp(wh) * anchor_grid
         conf = sigmoid(conf)
         prob = sigmoid(prob)
         # concat
@@ -343,18 +350,26 @@ class Yolo(Model):
     @staticmethod
     def apply_anchors_ver2(
         pred: np.ndarray,
-        anchor_grid: np.ndarray,
         stride: int,
-        anchor: List[int],
+        anchor: List[Tuple[int]],
         xyscale: float
     ) -> np.ndarray:
-        anchor = (np.array(anchor) / stride)[np.newaxis, np.newaxis, :, :]
+        assert len(pred.shape) == 3
+        assert pred.shape[2] == 255
+        # align the axes to (x, y, anchor, data)
+        pred = pred.reshape((*pred.shape[:2], 3, 85))
+        # calc grid of anchor box
+        anchor_grid = np.array(anchor)[np.newaxis, np.newaxis, :, :]
+        grid = np.meshgrid(
+            np.arange(pred.shape[1]), np.arange(pred.shape[0])
+        )
+        grid = np.stack(grid, axis=-1)[:, :, np.newaxis, :]
+        # apply anchor
         pred = sigmoid(pred)
-        # apply anchor to xy
-        pred[..., :2] = pred[..., :2] * xyscale - 0.5 + anchor_grid
-        # apply anchor to wh
-        pred[..., 2:4] = (pred[..., 2:4] * xyscale) ** 2 * anchor
-        pred[..., :4] *= stride
+        pred[..., :2] = (
+            (pred[..., :2] * xyscale) - (0.5 * (xyscale - 1)) + grid
+        ) * stride
+        pred[..., 2:4] = ((pred[..., 2:4] * xyscale) ** 2) * anchor_grid
         # expand all anchors
         bbox = np.reshape(pred, (-1, 85))
         return bbox
@@ -368,19 +383,10 @@ class Yolo(Model):
             stride = image_size // max(pred.shape[:2])
             anchor = anchors[stride]
             xyscale = xyscales[stride]
-            pred = np.reshape(pred, (*pred.shape[:2], 3, 85))
-            # calc grid of anchor box
-            anchor_grid = np.meshgrid(
-                np.arange(pred.shape[1]), np.arange(pred.shape[0])
-            )
-            anchor_grid = np.stack(
-                anchor_grid, axis=-1
-            )[:, :, np.newaxis, :]
             # call each version of apply_anchors
             if self.config.model in ['yolov4-csp', 'yolov4x-mish']:
                 bbox = self.apply_anchors_ver2(
                     pred=pred,
-                    anchor_grid=anchor_grid,
                     stride=stride,
                     anchor=anchor,
                     xyscale=xyscale
@@ -388,7 +394,6 @@ class Yolo(Model):
             else:
                 bbox = self.apply_anchors_ver1(
                     pred=pred,
-                    anchor_grid=anchor_grid,
                     stride=stride,
                     anchor=anchor,
                     xyscale=xyscale

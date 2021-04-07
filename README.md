@@ -24,9 +24,9 @@ run YOLO (object detection model) on various frameworks and compare them
     - yolov4
         - input image size: 512x512
     - [IN-PROGRESS] yolov4-csp ([Scaled-YOLOv4](https://github.com/WongKinYiu/ScaledYOLOv4/tree/yolov4-csp))
-        - input image size: 640x640
+        - input image size: 512x512
     - [IN-PROGRESS] yolov4x-mish ([YOLOv4-large P5](https://github.com/WongKinYiu/ScaledYOLOv4/tree/yolov4-large))
-        - input image size: 640x640
+        - input image size: 512x512
 - [IN-PROGRESS] YOLO V3 & V4 are able to run only on `tf`, `tflite` and `tf_onnx`
 - [YOLO V5](https://github.com/ultralytics/yolov5)
     - yolov5s
@@ -58,12 +58,6 @@ all deep learing frameworks below were ran on Python 3.7.9
 - onnx 1.8.1
 - onnx-tf 1.7.0
 - tf2onnx 1.8.4
-
-## my environment
-
-- MacBook Air (Retina, 2020)
-    - CPU: 1.1GHz quad core Intel Core i5
-    - Memory: 16GB 3733MHz LPDDR4X
 
 ## preparation
 
@@ -121,40 +115,80 @@ optional arguments:
   --disable-soft-nms    use hard-NMS instead of soft-NMS
   --disable-iou-subset  do not eliminate small and unconfident bounding box
                         which is inside of big and confident bounding box
+```
 
-frameworks:
-  torch                 PyTorch
+## frameworks
+
+```
+  torch                 PyTorch (state dict)
   torch_onnx            ONNX converted from PyTorch
   onnx_vino             OpenVINO converted from torch_onnx
-  onnx_tf               TensorFlow(SavedModel) converted from torch_onnx
-  tf                    TensorFlow(FrozenGraph)
+  onnx_tf               TensorFlow (SavedModel) converted from torch_onnx
+  tf                    TensorFlow (FrozenGraph)
   tflite                TensorFlow Lite
   tf_onnx               ONNX onverted from TensorFlow
 ```
 
 ## results
 
-NOTE: following data was measured at certain conditions. Just FYI.
+### conditions
+
+NOTE: following data was measured under certain conditions. Just FYI.
 
 - images: randomly selected 100 images from COCO val2017 dataset
-- Elapsed time includes...
+- elapsed time includes the times for...
     - image preprocessing
         - adjusting white balance
         - smoothing image with Gaussian Blur
         - correcting contract (brighten dark areas)
         - clarify image using Super-Resolution
+        - resize image and put it on the background (square, gray) image
     - inference
     - filtering bounding boxes
         - apply anchors
-        - calc confidence score
+            - some models calc that inside the model
+                - YOLO V5 (tf, tflite, tf_onnx)
+        - calc confidence scores
         - NMS
+            - soft NMS
             - eliminate small and unconfident bounding box which is inside of big and confident bounding box
-- confidence score threshold: 0.3
-- IoU threshold: 0.45
+- the size of the input image to models differs depending on the model
+    - YOLO V3/V4: 512 x 512
+    - YOLO V5: 640 x 640
+- confidence score threshold is the same regardless of the model
+    - `0.3`
+- IoU threshold is the same regardless of the model
+    - `0.45`
 - tool for calculating mAP: [`object_detection_metrics`](https://github.com/tetutaro/object_detection_metrics) (may be WRONG!!)
+
+### binary size
+
+| Model | torch | torch_onnx | onnx_vino | onnx_tf | tf | tflite (fp32) | tflite (fp16) | tflite (int8) | tf_onnx |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| yolov3-tiny | | | | | 34MB | 34MB | 17MB | 8.6MB | 34MB |
+| yolov3 | | | | | 237MB | 236MB | 118MB | 60MB | 236MB |
+| yolov3-spp | | | | | 241MB | 240MB | 120MB | 61MB | 240MB |
+| yolov4-tiny | | | | | 23MB | 23MB | 12MB | 5.9MB | 23MB |
+| yolov4 | | | | | 246MB | 246MB | 123MB | 63MB | 246MB |
+| yolov5s | 28MB | 28MB | 28MB | 28MB | 28MB | 28MB | 14MB | 7.4MB | 28MB |
+| yolov5m | 82MB | 82MB | 81MB | 82MB | 82MB | 82MB | 41MB | 21MB | 82MB |
+| yolov5l | 180MB | 179MB | 179MB | 180MB | 180MB | 180MB | 90MB | 46MB | 180MB |
+| yolov5x | 335MB | 335MB | 335MB | 336MB | 336MB | 335MB | 168MB | 85MB | 335MB |
+
+### my environment
+
+- MacBook Air (Retina, 2020)
+    - CPU: 1.1GHz quad core Intel Core i5
+    - Memory: 16GB 3733MHz LPDDR4X
+
+### elapsed time per each image
 
 ![](ipynb/time.png)
 
+### accuracy (mAP: mean Average Precision)
+
 ![](ipynb/map.png)
+
+### time vs accucary
 
 ![](ipynb/time_vs_map.png)

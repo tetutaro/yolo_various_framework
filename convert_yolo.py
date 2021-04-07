@@ -12,8 +12,8 @@ IMAGE_SIZES = {
     'yolov3-spp': 512,
     'yolov4-tiny': 512,
     'yolov4': 512,
-    'yolov4-csp': 640,
-    'yolov4x-mish': 640,
+    'yolov4-csp': 512,
+    'yolov4x-mish': 512,
 }
 DIRECTORY = 'weights/yolo'
 
