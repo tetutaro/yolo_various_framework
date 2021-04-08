@@ -1,6 +1,12 @@
 # yolo_various_framework
 
-run YOLO (object detection model) on various frameworks and compare them
+run YOLO (object detection model) on various frameworks
+
+## articles corresponding this repository (Qiita)
+
+following articles were written in Japanese only.
+
+- [YOLOを色んなフレームワークに変換して動かしてみた件](https://qiita.com/tetutaro/items/7adf3b22e4c42a17fe66)
 
 ## my motivations
 
