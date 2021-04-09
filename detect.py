@@ -59,12 +59,12 @@ if __name__ == '__main__':
         help='threshold of IoU to eliminte bounding boxes in NMS'
     )
     parser.add_argument(
-        '--disable-clarify-image', action='store_true',
-        help='disable image preprocessing'
+        '--clarify-image', action='store_true',
+        help='image preprocessing'
     )
     parser.add_argument(
-        '--disable-use-superres', action='store_true',
-        help='disable using Super-Resolution at image preprocessing'
+        '--use-superres', action='store_true',
+        help='use Super-Resolution at image preprocessing'
     )
     parser.add_argument(
         '--disable-soft-nms', action='store_true',

@@ -34,13 +34,13 @@ class Session(object):
     def __init__(
         self: Session,
         path: str,
-        disable_clarify_image: bool = False,
-        disable_use_superres: bool = False
+        clarify_image: bool = False,
+        use_superres: bool = False
     ) -> None:
         self.name = os.path.basename(path)
         self.image_id = os.path.splitext(self.name)[0]
-        self.disable_clarify_image = disable_clarify_image
-        self.disable_use_superres = disable_use_superres
+        self.is_clarify_image = clarify_image
+        self.use_superres = use_superres
         self.raw_image = cv2.imread(path)
         self.raw_height = self.raw_image.shape[0]
         self.raw_width = self.raw_image.shape[1]
@@ -65,13 +65,13 @@ class Session(object):
         self: Session,
         sr: Optional[dnn_superres_DnnSuperResImpl]
     ) -> None:
-        if self.disable_clarify_image:
+        if not self.is_clarify_image:
             return
         image = self.fine_image
         image = adjust_white_balance(image)
-        image = smooth_image(image)
         image = correct_contrast(image)
-        if not self.disable_use_superres:
+        image = smooth_image(image)
+        if self.use_superres:
             assert sr is not None
             image = upsample_image(image, sr)
         # stop using below functions
@@ -200,8 +200,8 @@ class Config(object):
         image_dir: str,
         conf_threshold: float,
         iou_threshold: float,
-        disable_clarify_image: bool,
-        disable_use_superres: bool,
+        clarify_image: bool,
+        use_superres: bool,
         disable_soft_nms: bool,
         disable_iou_subset: bool
     ) -> None:
@@ -211,8 +211,8 @@ class Config(object):
         self.image_dir = image_dir
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
-        self.disable_clarify_image = disable_clarify_image
-        self.disable_use_superres = disable_use_superres
+        self.clarify_image = clarify_image
+        self.use_superres = use_superres
         self.disable_soft_nms = disable_soft_nms
         self.disable_iou_subset = disable_iou_subset
         return
@@ -283,7 +283,7 @@ class Detector(object):
             )
         os.makedirs(self.result_dir, exist_ok=True)
         self.sr = None
-        if not config.disable_use_superres:
+        if config.use_superres:
             self.sr = dnn_superres.DnnSuperResImpl_create()
             self.sr.readModel('superres/ESPCN_x4.pb')
             self.sr.setModel('espcn', 4)
@@ -310,8 +310,8 @@ class Detector(object):
                 continue
             yield Session(
                 path=path,
-                disable_clarify_image=self.config.disable_clarify_image,
-                disable_use_superres=self.config.disable_use_superres
+                clarify_image=self.config.clarify_image,
+                use_superres=self.config.use_superres
             )
         return
 

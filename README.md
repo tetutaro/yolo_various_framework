@@ -7,6 +7,7 @@ run YOLO (object detection model) on various frameworks
 following articles were written in Japanese only.
 
 - [YOLOを色んなフレームワークに変換して動かしてみた件](https://qiita.com/tetutaro/items/7adf3b22e4c42a17fe66)
+- [OpenCVで簡単に実装できる画像前処理](https://qiita.com/tetutaro/items/443dcd22e8aee4884ea8)
 
 ## my motivations
 
@@ -90,8 +91,8 @@ usage: detect.py [-h]
     -d IMAGE_DIR
     [-c CONF_THRESHOLD]
     [-i IOU_THRESHOLD]
-    [--disable-clarify-image]
-    [--disable-use-superres]
+    [--clarify-image]
+    [--use-superres]
     [--disable-soft-nms]
     [--disable-iou-subset]
 
@@ -114,10 +115,10 @@ optional arguments:
   -i IOU_THRESHOLD, --iou-threshold IOU_THRESHOLD
                         threshold of IoU to eliminte bounding boxes in NMS
                         default: 0.45
-  --disable-clarify-image
-                        disable image preprocessing
-  --disable-use-superres
-                        disable using Super-Resolution at image preprocessing
+  --clarify-image
+                        image preprocessing
+  --use-superres
+                        use Super-Resolution at image preprocessing
   --disable-soft-nms    use hard-NMS instead of soft-NMS
   --disable-iou-subset  do not eliminate small and unconfident bounding box
                         which is inside of big and confident bounding box
