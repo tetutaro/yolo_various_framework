@@ -189,7 +189,7 @@ class DarknetBlock(Layer):
     '''Basic Block for YOLO (stack of Residual Block)
     '''
     def __init__(
-        self: DarknetResidual,
+        self: DarknetBlock,
         fils: Tuple[int, int],
         blocks: int,
         actfunc: str = 'leaky'
@@ -383,7 +383,11 @@ class DarknetConvSeq(Layer):
 
 
 class DarknetConvSeq_CSPnet(Layer):
-    def __init__(self: DarknetConvSeq, fil: int, blocks: int) -> None:
+    def __init__(
+        self: DarknetConvSeq_CSPnet,
+        fil: int,
+        blocks: int
+    ) -> None:
         super().__init__()
         self.weighted_layers = list()
         self.dc1 = DarknetConv(fil=fil, ksize=1, actfunc='mish')
@@ -401,7 +405,7 @@ class DarknetConvSeq_CSPnet(Layer):
         self.weighted_layers.extend(self.dc3.weighted_layers)
         return
 
-    def call(self: DarknetConvSeq, x: tf.Tensor) -> tf.Tensor:
+    def call(self: DarknetConvSeq_CSPnet, x: tf.Tensor) -> tf.Tensor:
         x = self.dc1(x)
         route = x
         x = self.dc3(tf.concat([
@@ -619,7 +623,7 @@ class Darknet53_CSPnet_2(Layer):
         self.weighted_layers.extend(self.spp.weighted_layers)
         return
 
-    def call(self: Darknet53_CSPnet, x: tf.Tensor) -> Tuple[tf.Tensor]:
+    def call(self: Darknet53_CSPnet_2, x: tf.Tensor) -> Tuple[tf.Tensor]:
         x = self.db3(self.db2(self.db1(self.dc(x))))
         route_1 = x
         x = self.db4(x)
@@ -762,7 +766,7 @@ class tf_YoloV4_tiny(tf.keras.Model):
         self.weighted_layers.extend(self.yl2.weighted_layers)
         return
 
-    def call(self: tf_YoloV3, inputs: tf.Tensor) -> Tuple[tf.Tensor]:
+    def call(self: tf_YoloV4_tiny, inputs: tf.Tensor) -> Tuple[tf.Tensor]:
         x_23, x = self.net(inputs)
         x = self.dc(x)
         x_27 = x

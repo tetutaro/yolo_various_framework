@@ -312,7 +312,7 @@ class tf_BottleneckCSP(Layer):
         ])
         return
 
-    def call(self, inputs):
+    def call(self: tf_BottleneckCSP, inputs: tf.Tensor):
         y1 = self.cv3(self.m(self.cv1(inputs)))
         y2 = self.cv2(inputs)
         return self.cv4(self.act(self.bn(tf.concat((y1, y2), axis=3))))
@@ -367,7 +367,7 @@ class tf_C3(Layer):
         ])
         return
 
-    def call(self, inputs):
+    def call(self: tf_C3, inputs: tf.Tensor):
         return self.cv3(tf.concat(
             (self.m(self.cv1(inputs)), self.cv2(inputs)), axis=3
         ))
