@@ -202,8 +202,7 @@ class Config(object):
         iou_threshold: float,
         clarify_image: bool,
         use_superres: bool,
-        disable_soft_nms: bool,
-        disable_iou_subset: bool
+        disable_soft_nms: bool
     ) -> None:
         self.model = model
         self.framework = framework
@@ -214,7 +213,6 @@ class Config(object):
         self.clarify_image = clarify_image
         self.use_superres = use_superres
         self.disable_soft_nms = disable_soft_nms
-        self.disable_iou_subset = disable_iou_subset
         return
 
 
@@ -330,8 +328,7 @@ class Detector(object):
             pred,
             conf_threshold=self.config.conf_threshold,
             iou_threshold=self.config.iou_threshold,
-            disable_soft_nms=self.config.disable_soft_nms,
-            disable_iou_subset=self.config.disable_iou_subset
+            disable_soft_nms=self.config.disable_soft_nms
         )
         end_time = time.perf_counter()
         # sort bounding boxes by confidence ascending

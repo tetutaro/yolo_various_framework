@@ -9,8 +9,7 @@ import numpy as np
 # bboxes2: the bounding boxes of same category expect above
 def bboxes_iou(
     bboxes1: np.ndarray,
-    bboxes2: np.ndarray,
-    disable_iou_subset: bool = False
+    bboxes2: np.ndarray
 ) -> np.ndarray:
     bboxes1_area = (
         bboxes1[:, 2] - bboxes1[:, 0]
@@ -31,19 +30,6 @@ def bboxes_iou(
         1.0 * inter_areas / union_areas,
         np.finfo(np.float32).eps
     )
-    if not disable_iou_subset:
-        # if the bouding box of bboxes2 is a subset of bboxes1,
-        # set IoU as 1.0 (should be removed)
-        is_subset = (
-            bboxes1[:, 0] <= bboxes2[:, 0]
-        ) * (
-            bboxes1[:, 1] <= bboxes2[:, 1]
-        ) * (
-            bboxes1[:, 2] >= bboxes2[:, 2]
-        ) * (
-            bboxes1[:, 3] >= bboxes2[:, 3]
-        )
-        ious = np.maximum(ious, is_subset)
     return ious
 
 
@@ -57,8 +43,7 @@ def filter_bboxes(
     bboxes: np.ndarray,
     conf_threshold: float = 0.3,
     iou_threshold: float = 0.45,
-    disable_soft_nms: bool = False,
-    disable_iou_subset: bool = False
+    disable_soft_nms: bool = False
 ) -> np.ndarray:
     if bboxes.shape[0] == 0:
         return bboxes
@@ -83,8 +68,7 @@ def filter_bboxes(
             cat_bboxes = np.delete(cat_bboxes, max_conf, axis=0)
             ious = bboxes_iou(
                 bboxes1=best_bbox,
-                bboxes2=cat_bboxes,
-                disable_iou_subset=disable_iou_subset
+                bboxes2=cat_bboxes
             )
             if disable_soft_nms:
                 cat_bboxes = cat_bboxes[ious < iou_threshold]

@@ -70,13 +70,6 @@ if __name__ == '__main__':
         '--disable-soft-nms', action='store_true',
         help='use hard-NMS instead of soft-NMS'
     )
-    parser.add_argument(
-        '--disable-iou-subset', action='store_true',
-        help=(
-            'do not eliminate small and unconfident bounding box'
-            ' which is inside of big and confident bounding box'
-        )
-    )
     args = parser.parse_args()
     if not os.path.isdir(args.image_dir):
         raise ValueError(

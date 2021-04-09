@@ -94,7 +94,6 @@ usage: detect.py [-h]
     [--clarify-image]
     [--use-superres]
     [--disable-soft-nms]
-    [--disable-iou-subset]
 
 detect objects from images
 
@@ -120,8 +119,6 @@ optional arguments:
   --use-superres
                         use Super-Resolution at image preprocessing
   --disable-soft-nms    use hard-NMS instead of soft-NMS
-  --disable-iou-subset  do not eliminate small and unconfident bounding box
-                        which is inside of big and confident bounding box
 ```
 
 ## frameworks
